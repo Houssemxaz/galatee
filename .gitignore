@@ -1,0 +1,27 @@
+# Dependencies and generated frontend output
+node_modules/
+frontend-react/node_modules/
+frontend-react/dist/
+
+# Local runtime data and uploaded files
+backend/data/*.sqlite
+backend/data/*.sqlite-*
+backend/data/*.db
+backend/data/uploads/
+backend/data/
+
+# Secrets and machine-local configuration
+.env
+.env.*
+!.env.example
+.claude/*.lock
+
+# Logs, temporary files and generated deliverables
+*.log
+__pycache__/
+*.pyc
+tmp/
+.tmp-*
+output/
+.artifact-fonts/
+*artifact-fonts*

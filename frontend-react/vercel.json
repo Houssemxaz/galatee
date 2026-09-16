@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/backoffice", "destination": "/backoffice.html" },
+    { "source": "/backoffice/:path*", "destination": "/backoffice.html" },
+    { "source": "/((?!mockups(?:/.*)?$).*)", "destination": "/index.html" }
+  ]
+}

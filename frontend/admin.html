@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#313118" />
+    <meta name="description" content="Back-office Galatee pour les reservations et les creneaux bloques." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%232F201D'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%23D8E2E5' stroke-width='2'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-size='28' font-family='Georgia' fill='%23D8E2E5'%3EG%3C/text%3E%3C/svg%3E" />
+    <title>Galatee - Back-office</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="admin-shell">
+      <header class="admin-header">
+        <a class="brand" href="/" aria-label="Retour au site Galatee">
+          <span class="brand-mark" aria-hidden="true">G</span>
+          <span>Galatee <small>Back-office</small></span>
+        </a>
+        <div class="header-meta">
+          <span class="live-indicator"><i aria-hidden="true"></i> Service local</span>
+          <a class="return-link" href="/backoffice.html">Menu, revenus &amp; analytics <span aria-hidden="true">→</span></a>
+          <a class="return-link" href="/">Voir le site <span aria-hidden="true">↗</span></a>
+        </div>
+      </header>
+
+      <main>
+        <nav class="admin-nav" aria-label="Navigation du tableau de bord">
+          <a href="#summary">Résumé</a>
+          <a href="#reservations">Réservations</a>
+          <a href="#availability">Disponibilités</a>
+          <a href="#blocked">Créneaux bloqués</a>
+        </nav>
+
+        <section class="page-intro" aria-labelledby="page-title">
+          <div>
+            <p class="eyebrow"><span></span> Opérations du restaurant</p>
+            <h1 id="page-title">Le service,<br /><em>en main.</em></h1>
+          </div>
+          <p class="intro-copy">Suivez les réservations du soir, ajustez leur statut et gardez les créneaux sensibles sous contrôle.</p>
+        </section>
+
+        <div class="admin-alert" data-alert role="alert" aria-live="assertive" hidden></div>
+
+        <section id="summary" class="auth-strip panel" aria-labelledby="auth-title">
+          <div class="auth-copy">
+            <p class="panel-kicker">Contexte de session</p>
+            <h2 id="auth-title">Connexion de service</h2>
+            <p>Le token reste uniquement dans la session de ce navigateur. Sans token, le serveur local reste accessible.</p>
+          </div>
+          <form class="auth-form" data-auth-form>
+            <label for="admin-token">Token admin optionnel</label>
+            <div class="input-action-row">
+              <input id="admin-token" name="adminToken" type="password" autocomplete="off" placeholder="GALATEE_ADMIN_TOKEN" data-token-input />
+              <button class="button button-dark" type="submit">Enregistrer</button>
+              <button class="button button-quiet" type="button" data-clear-token>Effacer</button>
+            </div>
+            <p class="auth-status" data-auth-status>Mode local sans token</p>
+          </form>
+        </section>
+
+        <section class="dashboard-grid" aria-label="Operations admin">
+          <article id="reservations" class="panel reservations-panel" aria-labelledby="reservations-title">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">Demandes du service</p>
+                <h2 id="reservations-title">Réservations</h2>
+              </div>
+              <button class="icon-button" type="button" data-refresh-reservations aria-label="Actualiser les réservations" title="Actualiser"><span aria-hidden="true">↻</span></button>
+            </div>
+
+            <div class="filters" aria-label="Filtres des reservations">
+                <label class="date-field" for="reservation-date">
+                  <span>Date</span>
+                  <input id="reservation-date" name="reservationDate" type="date" data-reservation-date inputmode="numeric" autocomplete="off" />
+              </label>
+              <label for="reservation-status">
+                <span>Statut de réservation</span>
+                <select id="reservation-status" name="reservationStatus" data-reservation-status>
+                  <option value="">Tous les statuts</option>
+                  <option value="requested">Demande en attente</option>
+                  <option value="confirmed">Confirmée</option>
+                  <option value="cancelled">Annulée</option>
+                  <option value="completed">Terminée</option>
+                </select>
+              </label>
+              <button class="button button-outline filter-button" type="button" data-reset-reservation-filters>Réinitialiser</button>
+            </div>
+
+            <div class="stats-row" data-reservation-stats aria-live="polite">
+              <div><strong data-stat-total>0</strong><span>Total</span></div>
+              <div><strong data-stat-requested>0</strong><span>En attente</span></div>
+              <div><strong data-stat-confirmed>0</strong><span>Confirmees</span></div>
+              <div><strong data-stat-covers>0</strong><span>Couverts confirmes</span></div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="reservation-table">
+                <thead>
+                  <tr><th>Date / heure</th><th>Prenom / nom</th><th>Party / table</th><th>Telephone / email</th><th>Demande speciale</th><th>Status</th><th>Action</th></tr>
+                </thead>
+                <tbody data-reservations-list>
+                  <tr><td colspan="7"><div class="state state-loading">Chargement des réservations...</div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside id="blocked" class="panel blocked-panel" aria-labelledby="blocked-title">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-kicker">Capacité & service</p>
+                <h2 id="blocked-title">Créneaux bloqués</h2>
+              </div>
+              <span class="panel-count" data-blocked-count>0</span>
+            </div>
+
+            <form class="blocked-form" data-blocked-form>
+              <div class="form-row-two">
+                <label class="date-field" for="blocked-date"><span>Date</span><input id="blocked-date" type="date" name="date" data-blocked-date inputmode="numeric" autocomplete="off" required /></label>
+                <label for="blocked-time"><span>Heure</span><select id="blocked-time" name="time" data-blocked-time required>
+                  <option value="">Choisir</option>
+                  <option value="19:00">19:00</option>
+                  <option value="19:30">19:30</option>
+                  <option value="20:00">20:00</option>
+                  <option value="20:30">20:30</option>
+                  <option value="21:00">21:00</option>
+                  <option value="21:30">21:30</option>
+                </select></label>
+              </div>
+              <label for="blocked-reason"><span>Motif</span><input id="blocked-reason" type="text" name="reason" maxlength="140" placeholder="Diner prive, maintenance..." required /></label>
+              <button class="button button-dark button-full" type="submit"><span>Bloquer le créneau</span><span aria-hidden="true">+</span></button>
+              <p class="form-hint">Le blocage retire le créneau des disponibilités publiques.</p>
+            </form>
+
+            <div class="blocked-toolbar">
+              <label class="date-field" for="blocked-filter"><span>Filtrer par date</span><input id="blocked-filter" name="blockedFilterDate" type="date" data-blocked-filter inputmode="numeric" autocomplete="off" /></label>
+                <button class="icon-button" type="button" data-refresh-blocked aria-label="Actualiser les créneaux bloqués" title="Actualiser"><span aria-hidden="true">↻</span></button>
+            </div>
+            <div class="blocked-list" data-blocked-list>
+              <div class="state state-loading">Chargement des blocages...</div>
+            </div>
+          </aside>
+        </section>
+
+        <section id="availability" class="panel availability-panel" aria-labelledby="availability-title">
+          <div class="panel-heading">
+            <div>
+                <p class="panel-kicker">Capacité du service</p>
+                <h2 id="availability-title">Disponibilités</h2>
+            </div>
+            <button class="icon-button" type="button" data-refresh-availability aria-label="Actualiser les disponibilités" title="Actualiser"><span aria-hidden="true">↻</span></button>
+          </div>
+
+          <div class="availability-filters" aria-label="Filtres des disponibilites">
+            <label class="date-field" for="availability-date">
+              <span>Date</span>
+              <input id="availability-date" name="availabilityDate" type="date" data-availability-date inputmode="numeric" autocomplete="off" maxlength="10" required />
+            </label>
+            <label for="availability-table-type">
+              <span>Type de table</span>
+              <select id="availability-table-type" name="availabilityTableType" data-availability-table-type>
+                <option value="all">Tous</option>
+                <option value="normal">Normal</option>
+                <option value="vip">VIP</option>
+              </select>
+            </label>
+            <label for="availability-time">
+              <span>Heure</span>
+              <select id="availability-time" name="availabilityTime" data-availability-time>
+                <option value="">Toutes les heures</option>
+                <option value="19:00">19:00</option>
+                <option value="19:30">19:30</option>
+                <option value="20:00">20:00</option>
+                <option value="20:30">20:30</option>
+                <option value="21:00">21:00</option>
+                <option value="21:30">21:30</option>
+              </select>
+            </label>
+            <label for="availability-party-size">
+              <span>Nombre de personnes</span>
+              <select id="availability-party-size" name="availabilityPartySize" data-availability-party-size>
+                <option value="1">1 personne</option>
+                <option value="2" selected>2 personnes</option>
+                <option value="3">3 personnes</option>
+                <option value="4">4 personnes</option>
+                <option value="5">5 personnes</option>
+                <option value="6">6 personnes</option>
+              </select>
+            </label>
+            <button class="button button-outline filter-button" type="button" data-reset-availability-filters>Reinitialiser</button>
+          </div>
+
+            <div class="availability-summary" data-availability-summary aria-live="polite">Chargement des disponibilités...</div>
+          <div class="availability-table-wrap">
+            <table class="availability-table">
+              <thead>
+                <tr><th>Creneau</th><th>Type</th><th>Capacite</th><th>Couverts confirmes</th><th>Places restantes</th><th>Etat</th></tr>
+              </thead>
+              <tbody data-availability-list aria-busy="true">
+                  <tr><td colspan="6"><div class="state state-loading">Chargement des disponibilités...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <footer class="admin-footer">
+        <span>Galatee · outil interne</span>
+        <span>Les actions sont transmises au serveur de reservation.</span>
+      </footer>
+    </div>
+    <script src="admin.js"></script>
+    <script src="admin-calendar.js"></script>
+  </body>
+</html>

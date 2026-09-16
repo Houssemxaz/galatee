@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs>
+    <filter id="stampEdge" x="-3%" y="-5%" width="106%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.007 0.022" numOctaves="3" seed="11" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="inkTexture" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="2" seed="33" result="noise"/>
+      <feComposite in="noise" in2="SourceGraphic" operator="in" result="texture"/>
+      <feBlend in="SourceGraphic" in2="texture" mode="multiply"/>
+    </filter>
+  </defs>
+  <path d="M128 606 C145 346 419 188 876 177 C1329 166 1633 315 1672 576 C1712 838 1417 1024 914 1029 C423 1035 109 877 128 606 Z" fill="#AF4F31" filter="url(#stampEdge)"/>
+  <path d="M190 604 C209 393 455 261 878 251 C1293 241 1567 370 1606 583 C1641 783 1371 947 910 954 C460 961 174 823 190 604 Z" fill="none" stroke="#F5EFE4" stroke-width="13" opacity=".94" filter="url(#stampEdge)"/>
+  <path d="M234 603 C248 424 482 306 880 298 C1269 291 1525 404 1558 588 C1586 756 1338 901 909 907 C492 912 219 794 234 603 Z" fill="none" stroke="#F5EFE4" stroke-width="4" opacity=".64"/>
+  <g fill="#F5EFE4" text-anchor="middle" filter="url(#inkTexture)">
+    <text x="900" y="665" font-family="Gabriola, 'Segoe Script', cursive" font-size="270" font-weight="600" font-style="italic" textLength="1200" lengthAdjust="spacingAndGlyphs">Solo al dente</text>
+    <text x="900" y="816" font-family="Arial, sans-serif" font-size="48" font-weight="700" letter-spacing="18">ALGER - HYDRA</text>
+  </g>
+</svg>

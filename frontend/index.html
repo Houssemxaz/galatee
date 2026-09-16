@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2F201D" />
+    <meta
+      name="description"
+      content="Galatee, maison de pates fraiches et service du soir a Paris."
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23151816'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%23EFE9E9' stroke-width='2'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-size='28' font-family='Georgia' fill='%23EFE9E9'%3EG%3C/text%3E%3C/svg%3E" />
+    <title>Galatee - Maison de pates fraiches</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="site-grain" aria-hidden="true"></div>
+
+    <header class="site-header" data-header>
+      <a class="wordmark" href="#top" aria-label="Galatee, accueil">
+        <span class="wordmark-mark" aria-hidden="true">G</span>
+        <span>Galatee</span>
+      </a>
+
+      <nav class="desktop-nav" aria-label="Navigation principale">
+        <a href="#reservation">Reservation</a>
+        <a href="#menu">Menu</a>
+        <a href="#contact">Contact</a>
+        <a href="#services">Services</a>
+        <a href="#informations">Informations</a>
+      </nav>
+
+      <a class="button button-small button-dark" href="#reservation">
+        <span>Reserver une table</span>
+        <span class="button-icon" aria-hidden="true">↗</span>
+      </a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu">
+        <span class="sr-only">Ouvrir le menu</span>
+        <span class="menu-toggle-line"></span>
+        <span class="menu-toggle-line"></span>
+      </button>
+    </header>
+
+    <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+      <nav aria-label="Navigation mobile">
+        <a href="#reservation">Reservation <span aria-hidden="true">↗</span></a>
+        <a href="#menu">Menu <span aria-hidden="true">↗</span></a>
+        <a href="#contact">Contact <span aria-hidden="true">↗</span></a>
+        <a href="#services">Services <span aria-hidden="true">↗</span></a>
+        <a href="#informations">Informations <span aria-hidden="true">↗</span></a>
+      </nav>
+      <p>Rue du Faubourg Saint-Martin, Paris 10e</p>
+    </div>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-backdrop" aria-hidden="true"></div>
+        <div class="hero-overlay" aria-hidden="true"></div>
+        <div class="hero-content shell reveal">
+          <p class="eyebrow eyebrow-light"><span></span> Paris, 10e · service du soir</p>
+          <h1 id="hero-title">La pasta,<br /><em>sans détour.</em></h1>
+          <p class="hero-copy">Une maison de pâtes fraîches où chaque assiette commence par un geste, une saison, une table.</p>
+          <div class="hero-actions">
+            <a class="button button-light" href="#reservation">
+              <span>Reserver une table</span>
+              <span class="button-icon" aria-hidden="true">↗</span>
+            </a>
+            <a class="text-link text-link-light" href="#menu">Voir la carte <span aria-hidden="true">↓</span></a>
+          </div>
+        </div>
+        <div class="hero-note" aria-hidden="true">
+          <span>Maison de pâtes fraîches</span>
+          <span>01 — 25</span>
+        </div>
+      </section>
+
+      <section class="menu-week section-paper" id="menu" aria-labelledby="menu-title">
+        <div class="shell">
+          <div class="menu-week-head reveal">
+            <div class="section-index">01 <span></span> Menu de la semaine</div>
+            <div class="menu-week-heading">
+              <div class="menu-week-copy">
+                <p class="eyebrow"><span></span> Compose chaque soir</p>
+                <h2 id="menu-title">La saison<br /><em>dans l'assiette.</em></h2>
+                <p>Une carte courte, vivante et precise. Cette semaine, la pâte rencontre la truffe, la courge et la betterave.</p>
+              </div>
+              <div class="menu-week-actions" aria-label="Actions du menu">
+                <a class="button button-dark" href="#reservation">
+                  <span>Reserver une table</span>
+                  <span class="button-icon" aria-hidden="true">↗</span>
+                </a>
+                <a class="text-link" href="#menu-detail">Voir le menu detaille <span aria-hidden="true">↓</span></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="menu-immersive-bar reveal">
+            <a class="menu-return" href="#top"><span aria-hidden="true">↑</span> Retour a l'accueil</a>
+            <div class="menu-categories" role="group" aria-label="Filtrer le menu">
+              <button class="menu-category is-active" type="button" data-menu-filter="all" aria-pressed="true">Tout <span aria-hidden="true">↘</span></button>
+              <button class="menu-category" type="button" data-menu-filter="fresca" aria-pressed="false">Pasta fresca <span aria-hidden="true">↘</span></button>
+              <button class="menu-category" type="button" data-menu-filter="ripiena" aria-pressed="false">Pasta ripiena <span aria-hidden="true">↘</span></button>
+              <button class="menu-category" type="button" data-menu-filter="vegetal" aria-pressed="false">Vegetal <span aria-hidden="true">↘</span></button>
+            </div>
+          </div>
+
+          <div class="menu-status" data-menu-status role="status" aria-live="polite">3 plats dans le menu de la semaine.</div>
+          <div class="menu-grid" id="menu-detail" aria-label="Menu de la semaine">
+            <details class="menu-card reveal" data-menu-category="fresca">
+              <summary class="menu-card-trigger">
+                <img class="menu-card-image" src="assets/menu-tagliolini.png" alt="Tagliolini frais avec truffe noire et parmesan" loading="lazy" decoding="async" />
+                <span class="menu-card-meta">
+                  <span class="menu-tag">Pasta fresca</span>
+                  <span class="menu-card-title-row"><span class="menu-card-title">Tagliolini, beurre noisette</span><span class="menu-price">29 €</span></span>
+                  <span class="menu-card-short">Truffe noire, parmesan 36 mois</span>
+                  <span class="menu-card-toggle" aria-hidden="true">+</span>
+                </span>
+              </summary>
+              <div class="menu-card-long"><p>Une pâte fine tiree chaque jour, nappee d'un beurre noisette aux notes de sous-bois. La truffe noire et le parmesan affiné apportent une profondeur nette, sans alourdir l'assiette.</p></div>
+            </details>
+            <details class="menu-card reveal" data-menu-category="vegetal">
+              <summary class="menu-card-trigger">
+                <img class="menu-card-image" src="assets/menu-ravioli.png" alt="Ravioli de courge avec beurre de sauge et noisettes" loading="lazy" decoding="async" />
+                <span class="menu-card-meta">
+                  <span class="menu-tag">Le vegetal</span>
+                  <span class="menu-card-title-row"><span class="menu-card-title">Ravioli de courge, sauge</span><span class="menu-price">27 €</span></span>
+                  <span class="menu-card-short">Noisette du Piemont, vinaigre de Xeres</span>
+                  <span class="menu-card-toggle" aria-hidden="true">+</span>
+                </span>
+              </summary>
+              <div class="menu-card-long"><p>La courge rôtie est enveloppee dans une pâte souple, puis servie avec une sauge croustillante, la rondeur de la noisette et quelques gouttes de vinaigre de Xeres.</p></div>
+            </details>
+            <details class="menu-card reveal" data-menu-category="ripiena">
+              <summary class="menu-card-trigger">
+                <img class="menu-card-image" src="assets/menu-tortelli.png" alt="Tortelli de betterave et ricotta avec herbes fraîches" loading="lazy" decoding="async" />
+                <span class="menu-card-meta">
+                  <span class="menu-tag">Pasta ripiena</span>
+                  <span class="menu-card-title-row"><span class="menu-card-title">Tortelli betterave &amp; ricotta</span><span class="menu-price">26 €</span></span>
+                  <span class="menu-card-short">Huile d'herbes, citron confit</span>
+                  <span class="menu-card-toggle" aria-hidden="true">+</span>
+                </span>
+              </summary>
+              <div class="menu-card-long"><p>Une farce de betterave rôtie et ricotta fraîche, relevée par le citron confit. L'huile d'herbes termine le plat avec une fraîcheur végétale et précise.</p></div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="chefs section-ink" id="chefs" aria-labelledby="chefs-title">
+        <div class="shell chefs-grid">
+          <div class="chefs-intro reveal">
+            <div class="section-index section-index-light">02 <span></span> Les chefs</div>
+            <p class="eyebrow eyebrow-light"><span></span> Une cuisine de transmission</p>
+            <h2 id="chefs-title">Celles et<br /><em>ceux qui font.</em></h2>
+            <p>Chez Galatee, le geste est collectif. Chaque service prolonge une histoire de gestes appris, de marchés matinaux et de recettes qui restent en mouvement.</p>
+          </div>
+          <div class="chef-list reveal">
+            <article class="chef-profile">
+              <div class="chef-profile-top"><span class="chef-number">01</span><span class="chef-role">Cheffe executive</span></div>
+              <h3>Sofia Rinaldi</h3>
+              <p>Formee entre Modene et Paris, Sofia compose une cuisine italienne de saison, directe et genereuse. Elle signe les farces, les bouillons et la carte du soir.</p>
+            </article>
+            <article class="chef-profile">
+              <div class="chef-profile-top"><span class="chef-number">02</span><span class="chef-role">Chef de production</span></div>
+              <h3>Marcello Conti</h3>
+              <p>Ancien tourier, Marcello veille aux textures et aux temps de repos. Son atelier donne au service sa cadence calme, de la première feuille au dernier tortello.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="reservation section-paper" id="reservation" aria-labelledby="reservation-title">
+        <div class="shell reservation-grid">
+          <div class="reservation-intro reveal">
+            <div class="section-index">03 <span></span> La table</div>
+            <p class="eyebrow"><span></span> Votre soiree chez Galatee</p>
+            <h2 id="reservation-title">Prenons<br /><em>le temps.</em></h2>
+            <p>Le service commence à 19h. Pour une demande particulière, indiquez-la dans votre réservation et notre équipe vous répondra avec attention.</p>
+            <div class="plate-mark" aria-hidden="true"><span>G</span></div>
+          </div>
+
+          <form class="reservation-form reveal" data-reservation-form novalidate>
+            <div class="form-header">
+              <span>Demande de reservation</span>
+              <span class="form-step">EN UNE ETAPE</span>
+            </div>
+
+            <div class="form-section-heading"><span>Vos coordonnees</span></div>
+            <div class="form-row form-row-two">
+              <label>
+                <span>Prenom</span>
+                <input type="text" name="firstName" autocomplete="given-name" required />
+              </label>
+              <label>
+                <span>Nom</span>
+                <input type="text" name="lastName" autocomplete="family-name" required />
+              </label>
+            </div>
+            <label>
+              <span>Telephone</span>
+              <input type="tel" name="phone" autocomplete="tel" required />
+            </label>
+            <label>
+              <span>Email <small>Optionnel</small></span>
+              <input type="email" name="email" autocomplete="email" />
+            </label>
+            <label>
+              <span>Demande speciale <small>Optionnel</small></span>
+              <textarea name="specialRequest" rows="3" placeholder="Allergie, occasion, preference de placement..."></textarea>
+            </label>
+
+            <div class="form-section-heading"><span>Votre service</span></div>
+            <div class="form-row form-row-two">
+              <label>
+                <span>Date</span>
+                <input type="date" name="date" data-date-input inputmode="numeric" autocomplete="off" maxlength="10" max="9999-12-31" title="Format attendu : AAAA-MM-JJ" aria-describedby="date-hint" required />
+                <small class="field-hint" id="date-hint">Format : AAAA-MM-JJ · service du mercredi au samedi</small>
+              </label>
+              <label>
+                <span>Nombre de personnes</span>
+                <select name="partySize" data-party-input required>
+                  <option value="2">2 personnes</option>
+                  <option value="3">3 personnes</option>
+                  <option value="4">4 personnes</option>
+                  <option value="5">5 personnes</option>
+                  <option value="6">6 personnes</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row form-row-two">
+              <label>
+                <span>Type de table</span>
+                <select name="tableType" required>
+                  <option value="normal">Normal</option>
+                  <option value="vip">VIP</option>
+                </select>
+              </label>
+              <label>
+                <span>Heure d'arrivee</span>
+                <select name="time" data-time-input required disabled>
+                  <option value="">Choisissez d'abord une date</option>
+                </select>
+              </label>
+            </div>
+            <div class="availability-status" data-availability-status role="status" aria-live="polite">Les créneaux apparaîtront ici.</div>
+            <div class="reservation-error" id="reservation-error" data-reservation-error role="alert" hidden></div>
+            <button class="button button-dark button-full" type="submit">
+              <span>Envoyer la demande</span>
+              <span class="button-icon" aria-hidden="true">↗</span>
+            </button>
+            <p class="form-note">Votre demande sera examinee par le restaurant. La reservation n'est confirmee qu'apres notre reponse.</p>
+
+            <div class="reservation-success" data-reservation-success hidden role="status" aria-live="polite" tabindex="-1">
+              <span class="success-mark" aria-hidden="true">G</span>
+              <p class="eyebrow"><span></span> Demande recue</p>
+              <h3>En attente de<br /><em>confirmation.</em></h3>
+              <p>Notre equipe reviendra vers vous pour confirmer le service choisi. Aucune table n'est confirmee avant notre reponse.</p>
+              <a class="text-link" href="#top">Retour en haut <span aria-hidden="true">↗</span></a>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="services section-image" id="services" aria-labelledby="services-title">
+        <div class="restaurant-backdrop" aria-hidden="true"></div>
+        <div class="restaurant-overlay" aria-hidden="true"></div>
+        <div class="shell restaurant-content reveal">
+          <div class="section-index section-index-light">04 <span></span> Services</div>
+          <p class="eyebrow eyebrow-light"><span></span> Une adresse, un rythme</p>
+          <h2 id="services-title">Le service<br /><em>du soir.</em></h2>
+          <p class="section-image-lead">Une table vivante, un menu court et le temps necessaire pour bien faire. Les demandes d'accords, d'occasions et de privatisation se preparent avec notre equipe.</p>
+          <div class="restaurant-meta">
+            <div><span>Le soir</span><p>Mercredi - Samedi<br />19h - 23h30</p></div>
+            <div><span>Formats</span><p>Carte courte<br />Menu en quatre temps</p></div>
+            <div><span>A la demande</span><p>Accord vins nature<br />Diner prive sur demande</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="informations section-paper" id="informations" aria-labelledby="informations-title">
+        <div class="shell information-grid">
+          <div class="section-index reveal">05 <span></span> Informations</div>
+          <div class="information-content reveal">
+            <p class="eyebrow"><span></span> Avant votre venue</p>
+            <h2 id="informations-title">Tout ce qu'il<br /><em>faut savoir.</em></h2>
+            <div class="information-list">
+              <div><span>Adresse</span><p>24 rue du Faubourg Saint-Martin<br />75010 Paris</p></div>
+              <div><span>Accès</span><p>Metro Strasbourg-Saint-Denis<br />A quelques minutes à pied</p></div>
+              <div><span>Attention</span><p>Prévenez-nous pour toute allergie ou contrainte alimentaire lors de votre demande.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact section-paper" id="contact" aria-labelledby="contact-title">
+        <div class="shell contact-row reveal">
+          <div>
+            <div class="section-index">06 <span></span> Contact</div>
+            <p class="eyebrow"><span></span> Une question avant la table</p>
+            <h2 id="contact-title">Parlons-nous<br /><em>avant le service.</em></h2>
+            <p class="contact-copy">Notre équipe vous répond du mercredi au samedi pour préparer votre venue, un dîner privé ou une attention particulière.</p>
+            <div class="contact-details"><a href="tel:+33142380125">01 42 38 01 25</a><a href="mailto:bonjour@galatee.paris">bonjour@galatee.paris</a></div>
+          </div>
+          <a class="button button-dark" href="#reservation">
+            <span>Reserver une table</span>
+            <span class="button-icon" aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" id="footer">
+      <div class="shell footer-grid">
+        <div><a class="wordmark wordmark-footer" href="#top"><span class="wordmark-mark" aria-hidden="true">G</span><span>Galatee</span></a><p>Maison de pâtes fraîches<br />Paris, 10e</p></div>
+        <div class="footer-links"><a href="#reservation">Reservation</a><a href="#menu">Menu</a><a href="#contact">Contact</a><a href="#services">Services</a><a href="#informations">Informations</a></div>
+        <div class="footer-note"><span>© 2025 Galatee</span><span>Instagram ↗</span></div>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

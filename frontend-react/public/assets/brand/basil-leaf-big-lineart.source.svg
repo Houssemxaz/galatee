@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600">
+  <defs>
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.027" numOctaves="2" seed="17" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke="#72814A" stroke-linecap="round" stroke-linejoin="round" filter="url(#ink)">
+    <path d="M770 1325 C780 1100 785 900 790 680 C795 520 805 400 820 285" stroke-width="22"/>
+    <path d="M790 865 C650 825 510 755 348 610" stroke-width="20"/>
+    <path d="M798 760 C925 675 1060 565 1225 410" stroke-width="20"/>
+
+    <path d="M820 285 C710 328 642 414 654 510 C666 604 728 665 790 680 C865 624 918 537 895 439 C877 359 849 310 820 285 Z" stroke-width="22"/>
+    <path d="M808 317 C780 400 775 514 790 680" stroke-width="12" opacity=".82"/>
+    <path d="M792 432 C748 420 713 398 680 365 M791 493 C837 468 868 438 891 405 M791 552 C748 545 709 520 670 484 M790 608 C832 582 863 553 889 519" stroke-width="10" opacity=".64"/>
+
+    <path d="M348 610 C374 724 446 810 548 821 C652 832 735 794 790 865 C772 746 713 649 617 610 C520 571 420 576 348 610 Z" stroke-width="22"/>
+    <path d="M378 626 C500 668 641 741 790 865" stroke-width="12" opacity=".82"/>
+    <path d="M496 666 C474 708 450 741 420 768 M566 701 C554 749 540 782 520 815 M640 739 C630 773 622 801 612 824" stroke-width="10" opacity=".64"/>
+
+    <path d="M1225 410 C1101 384 991 417 930 503 C870 587 888 681 798 760 C925 752 1034 701 1098 615 C1160 532 1207 454 1225 410 Z" stroke-width="22"/>
+    <path d="M1194 431 C1084 510 956 621 798 760" stroke-width="12" opacity=".82"/>
+    <path d="M1091 503 C1103 547 1117 582 1137 611 M1022 559 C1029 600 1041 635 1059 670 M953 620 C960 653 970 683 985 706" stroke-width="10" opacity=".64"/>
+  </g>
+</svg>

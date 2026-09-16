@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 60" preserveAspectRatio="none" role="img" aria-label="frise décorative">
+  <g fill="none" stroke="#D0362B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 30 C 40 12, 90 48, 130 30 C 170 12, 210 48, 250 30 C 290 12, 330 48, 370 30 C 410 12, 460 48, 480 30"/>
+    <ellipse cx="90" cy="30" rx="8" ry="8"/>
+    <ellipse cx="250" cy="30" rx="8" ry="8"/>
+    <ellipse cx="410" cy="30" rx="8" ry="8"/>
+  </g>
+  <g fill="none" stroke="#3A6E42" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M170 30 C 170 22, 178 18, 186 22 C 180 30, 176 32, 170 30 Z"/>
+    <path d="M330 30 C 330 22, 338 18, 346 22 C 340 30, 336 32, 330 30 Z"/>
+  </g>
+</svg>

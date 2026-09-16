@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 180" role="img" aria-label="Pasta by Galatée">
+  <defs>
+    <filter id="handdrawn" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" scale="2.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#handdrawn)">
+    <ellipse cx="210" cy="82" rx="176" ry="62" fill="none" stroke="#D0362B" stroke-width="6.5" stroke-linecap="round"/>
+    <ellipse cx="210" cy="82" rx="176" ry="62" fill="none" stroke="#D0362B" stroke-width="2" stroke-linecap="round" opacity=".55" transform="translate(1.5,1)"/>
+  </g>
+  <text x="210" y="106" text-anchor="middle" font-family="Caveat, cursive" font-weight="700" font-size="86" fill="#D0362B" letter-spacing="0.01em">PASTA</text>
+  <text x="298" y="152" text-anchor="middle" font-family="Caveat, cursive" font-style="italic" font-weight="500" font-size="22" fill="#7A1E24">by Galatée</text>
+</svg>

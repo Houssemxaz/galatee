@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Galatee — Direction chic & raffinée</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+:root{
+  --ink:#2b2416;
+  --paper:#ebe0c3;
+  --paper-deep:#ddd0ae;
+  --paper-warm:#f4ecd3;
+  --olive-dark:#2f2f17;
+  --olive-mid:#4a4a24;
+  --olive-light:#6d6844;
+  --accent:#a55a34;
+  --accent-soft:#c26a3d;
+  --accent-deep:#7a3f22;
+  --clay:#6d6844;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --ease-drawer:cubic-bezier(.32,.72,0,1);
+}
+html,body{width:100%;min-height:100vh;overflow-x:hidden;background:#d9cca8;color:var(--ink);}
+body{font-family:var(--body);}
+
+.hero{position:relative;width:100%;height:100vh;min-height:720px;
+  background:
+    radial-gradient(ellipse 60% 45% at 55% 40%, #f8efd0 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 40% 55%, #f2e6c4 0%, transparent 65%),
+    radial-gradient(ellipse 90% 80% at 90% 100%, rgba(180,140,80,.25) 0%, transparent 55%),
+    linear-gradient(155deg, #f0e4c0 0%, #e6d8ae 55%, #d9c893 100%);
+  overflow:hidden;
+}
+/* Satin fold — subtle diagonal light band + shadow band across the cream */
+.satin{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    linear-gradient(102deg, transparent 25%, rgba(255,240,190,.42) 42%, rgba(255,235,170,.55) 50%, rgba(210,175,110,.22) 58%, transparent 78%),
+    linear-gradient(102deg, transparent 60%, rgba(120,80,30,.18) 72%, transparent 85%);
+  filter:blur(6px);mix-blend-mode:overlay;}
+/* Marble veins horizontal */
+.veins{position:absolute;inset:0;z-index:2;opacity:.32;pointer-events:none;}
+/* Stone grain */
+.stone{position:absolute;inset:0;z-index:3;opacity:.4;mix-blend-mode:multiply;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 1440 900' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .028' numOctaves='4' seed='11'/%3E%3CfeColorMatrix values='0 0 0 0 .35  0 0 0 0 .28  0 0 0 0 .15  0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");}
+.grain{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:.38;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .3  0 0 0 0 .22  0 0 0 0 .1  0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+.frame{position:absolute;inset:32px;border:1px solid rgba(43,36,22,.32);z-index:2;pointer-events:none;opacity:0;animation:fadeIn 800ms 100ms var(--ease-out) forwards;}
+.frame::before,.frame::after{content:"";position:absolute;width:14px;height:14px;opacity:0;animation:fadeIn 600ms 500ms var(--ease-out) forwards;}
+.frame::before{top:-6px;left:-6px;border-top:1px solid var(--accent);border-left:1px solid var(--accent);}
+.frame::after{bottom:-6px;right:-6px;border-bottom:1px solid var(--olive-light);border-right:1px solid var(--olive-light);animation-delay:650ms;}
+
+/* Curtain — a warm cream sheet that pulls back to reveal the hero (like the production heroCurtain) */
+.curtain{position:absolute;inset:0;z-index:60;background:#f4ecd3;transform-origin:left;animation:curtain 1100ms 100ms var(--ease-out) both;pointer-events:none;}
+
+.nav{position:absolute;top:56px;left:64px;right:430px;z-index:30;display:flex;align-items:center;justify-content:space-between;color:var(--ink);opacity:0;animation:riseIn 700ms 350ms var(--ease-out) forwards;padding-bottom:16px;border-bottom:1px solid rgba(43,36,22,.16);}
+.wordmark{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#1a150a;}
+.wordmark em{font-style:italic;color:var(--accent);text-transform:none;letter-spacing:0;}
+.navlinks{display:flex;gap:40px;font-size:10.5px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:#1a150a;}
+.navlinks a{color:inherit;text-decoration:none;transition:color 200ms ease;cursor:pointer;position:relative;padding:6px 0;}
+.navlinks a:hover{color:var(--accent);}
+.navlinks .active{color:var(--accent);}
+.navlinks .active::after{content:"";position:absolute;left:0;right:0;bottom:-17px;height:2px;background:var(--accent);}
+
+.letter{position:absolute;top:120px;left:110px;right:430px;bottom:32px;z-index:20;display:flex;flex-direction:column;}
+.kicker{display:flex;align-items:center;gap:14px;font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--accent);margin-bottom:34px;opacity:0;animation:riseIn 700ms 550ms var(--ease-out) forwards;}
+.kicker i{width:36px;height:1px;background:var(--accent);display:inline-block;transform-origin:left;animation:growLine 700ms 550ms var(--ease-out) both;}
+.kicker .loc{color:var(--olive-light);letter-spacing:.28em;}
+h1{font-family:var(--display);font-weight:500;font-size:82px;line-height:1.02;letter-spacing:-.01em;color:var(--ink);margin-bottom:36px;}
+h1 .a1{display:block;opacity:0;animation:riseIn 800ms 700ms var(--ease-out) forwards;}
+h1 .a2{display:block;font-style:italic;color:var(--accent);opacity:0;animation:riseIn 850ms 900ms var(--ease-out) forwards;}
+.rule{display:flex;align-items:center;gap:8px;margin-bottom:32px;opacity:0;animation:fadeIn 500ms 1100ms var(--ease-out) forwards;}
+.rule i{display:inline-block;height:1px;transform:scaleX(0);transform-origin:left;}
+.rule .r1{width:30px;background:var(--olive-light);animation:growLine 500ms 1100ms var(--ease-out) forwards;}
+.rule .r2{width:30px;background:var(--accent);animation:growLine 500ms 1200ms var(--ease-out) forwards;}
+.lede{font-family:var(--display);font-style:italic;font-weight:500;font-size:22px;line-height:1.45;color:var(--ink);max-width:440px;margin-bottom:14px;opacity:0;animation:riseIn 700ms 1250ms var(--ease-out) forwards;}
+.note{font-size:13.5px;line-height:1.65;color:#544c3a;max-width:400px;margin-bottom:0;opacity:0;animation:riseIn 700ms 1400ms var(--ease-out) forwards;}
+.actions{display:flex;gap:32px;align-items:center;margin-top:auto;padding-top:32px;opacity:0;animation:riseIn 700ms 1550ms var(--ease-out) forwards;}
+.btn{min-height:54px;padding:0 30px;display:inline-flex;align-items:center;gap:16px;background:var(--olive-dark);color:var(--paper-warm);border:0;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:600;cursor:pointer;transition:background 220ms var(--ease-out), transform 180ms var(--ease-out);text-decoration:none;}
+.btn:hover{background:var(--accent);}
+.btn:active{transform:scale(.97);}
+.btn span:last-child{transition:transform 220ms var(--ease-out);}
+.btn:hover span:last-child{transform:translateX(4px);}
+.link{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink);font-weight:600;padding:14px 0 8px;border-bottom:1px solid var(--accent);cursor:pointer;transition:color 200ms ease, border-color 200ms ease;text-decoration:none;display:inline-flex;align-items:center;gap:8px;}
+.link::after{content:"↓";font-size:11px;transition:transform 220ms var(--ease-out);}
+.link:hover{color:var(--accent);}
+.link:hover::after{transform:translateY(3px);}
+
+.panel{position:absolute;top:120px;right:56px;bottom:32px;width:340px;z-index:15;color:var(--paper-warm);display:flex;flex-direction:column;padding:52px 30px 40px;overflow:hidden;
+  background:
+    radial-gradient(ellipse 65% 40% at 50% 30%, rgba(180,155,90,.35) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 30% 90%, rgba(10,10,4,.4) 0%, transparent 55%),
+    linear-gradient(160deg, var(--olive-mid) 0%, var(--olive-dark) 55%, #1a1a0c 100%);
+  box-shadow:0 30px 60px rgba(43,36,22,.4), 0 12px 24px rgba(43,36,22,.25), inset 0 1px 0 rgba(255,245,200,.12);
+  opacity:0;transform:translateX(30px);animation:slideInRight 900ms 450ms var(--ease-out) forwards;}
+.panel::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg, transparent 25%, rgba(200,170,100,.3) 42%, rgba(230,190,120,.5) 50%, transparent 65%),
+             linear-gradient(105deg, transparent 60%, rgba(5,5,3,.55) 70%, transparent 82%);
+  filter:blur(5px);mix-blend-mode:overlay;pointer-events:none;}
+.panel::after{content:"";position:absolute;left:0;top:0;bottom:0;width:1px;background:linear-gradient(180deg, transparent, rgba(244,236,211,.2), transparent);}
+
+/* Terracotta chip — overlaps the top-left corner of the olive panel */
+.chip{position:absolute;top:110px;right:290px;width:210px;height:66px;z-index:20;
+  background:linear-gradient(155deg, var(--accent-soft) 0%, var(--accent) 60%, var(--accent-deep) 100%);
+  clip-path:polygon(0 0, 100% 0, 88% 100%, 0 100%);
+  box-shadow:0 14px 32px rgba(122,63,34,.4), 0 4px 10px rgba(122,63,34,.3);
+  display:flex;flex-direction:column;justify-content:center;padding:0 32px 0 26px;
+  color:var(--paper-warm);
+  opacity:0;transform:translateY(-14px);animation:chipIn 700ms 1400ms var(--ease-out) forwards;}
+.chip::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg, transparent 35%, rgba(255,200,140,.35) 50%, transparent 65%);
+  filter:blur(4px);pointer-events:none;}
+.chip::after{content:"";position:absolute;top:8px;left:16px;right:16px;height:1px;background:rgba(244,236,211,.42);}
+.chip b{font-family:var(--body);font-weight:700;font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--paper-warm);margin-bottom:4px;line-height:1;}
+.chip span{font-family:var(--display);font-style:italic;font-size:17px;letter-spacing:.04em;line-height:1;color:var(--paper-warm);}
+@keyframes chipIn { from { opacity:0; transform:translateY(-14px); } to { opacity:1; transform:translateY(0); } }
+
+.panel-brand{position:relative;text-align:center;margin-bottom:24px;}
+.seal{display:none;}
+.panel-title{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;margin-bottom:6px;opacity:0;animation:riseIn 700ms 1000ms var(--ease-out) forwards;}
+.panel-title em{font-style:italic;color:var(--accent-soft);text-transform:none;letter-spacing:0;}
+.panel-sub{font-size:10px;letter-spacing:.34em;text-transform:uppercase;color:rgba(244,236,211,.55);opacity:0;animation:riseIn 700ms 1100ms var(--ease-out) forwards;}
+
+.ornament{position:relative;width:60px;height:70px;margin:0 auto 20px;opacity:0;animation:fadeIn 600ms 700ms var(--ease-out) forwards;}
+.ornament path{stroke-dasharray:260;stroke-dashoffset:260;animation:drawStroke 1400ms 900ms var(--ease-out) forwards;}
+
+.panel-card{position:relative;border-top:1px solid rgba(244,236,211,.18);padding-top:26px;margin-bottom:32px;opacity:0;animation:riseIn 700ms 1250ms var(--ease-out) forwards;}
+.card-hd{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent-soft);margin-bottom:18px;}
+.card-hd i{width:22px;height:1px;background:var(--accent-soft);}
+.card-desc{font-family:var(--display);font-style:italic;font-size:17px;line-height:1.5;color:var(--paper-warm);margin-bottom:22px;}
+.card-line{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(244,236,211,.15);font-size:10px;letter-spacing:.22em;text-transform:uppercase;}
+.card-line:last-child{border-bottom:0;}
+.card-line .k{color:rgba(244,236,211,.55);}
+.card-line .v{color:var(--paper-warm);}
+
+.panel-foot{position:relative;margin-top:auto;text-align:center;font-family:var(--display);font-style:italic;font-size:14px;color:rgba(244,236,211,.6);letter-spacing:.05em;opacity:0;animation:riseIn 700ms 1500ms var(--ease-out) forwards;}
+.panel-foot::before{content:"";display:block;width:32px;height:1px;background:rgba(244,236,211,.35);margin:0 auto 14px;}
+
+.folio{position:absolute;top:190px;right:472px;font-family:var(--display);font-style:italic;font-size:14px;color:var(--olive-light);letter-spacing:.05em;opacity:0;animation:riseIn 700ms 700ms var(--ease-out) forwards;}
+
+.service{margin-top:32px;padding-top:20px;border-top:1px solid rgba(43,36,22,.2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--olive-light);opacity:0;animation:riseIn 700ms 1700ms var(--ease-out) forwards;}
+.service span:nth-child(2){color:var(--accent);}
+
+@keyframes riseIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes growLine { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:none; } }
+@keyframes sealIn { from { opacity:0; transform:scale(.85); } to { opacity:1; transform:scale(1); } }
+@keyframes sealGlow { 0%,100% { box-shadow: inset 0 0 20px rgba(165,90,52,.2); } 50% { box-shadow: inset 0 0 32px rgba(165,90,52,.42); } }
+@keyframes drawStroke { to { stroke-dashoffset:0; } }
+@keyframes curtain { from { transform:scaleX(1); } to { transform:scaleX(0); } }
+
+/* Responsive tablet fallback */
+@media (max-width: 1180px) and (min-width: 769px) {
+  .hero{min-height:auto;height:auto;padding:96px 0 48px;}
+  .frame{inset:20px;}
+  .nav{position:relative;top:auto;left:auto;right:auto;padding:0 40px 16px;}
+  .panel{position:relative;top:auto;right:auto;bottom:auto;width:calc(100% - 40px);margin:32px auto 0;padding:56px 32px;}
+  .letter{position:relative;top:auto;left:auto;right:auto;bottom:auto;padding:56px 40px 0;max-width:100%;height:auto;}
+  .service{padding-top:32px;flex-wrap:wrap;gap:12px;}
+  h1{font-size:clamp(40px,9vw,64px);}
+}
+
+/* ══════════ MOBILE — REDESIGNED FOR PORTRAIT ══════════ */
+@media (max-width: 1180px) and (min-width: 769px) {
+  .chip { display: none; }
+}
+@media (max-width: 768px) {
+  html, body { height: auto; }
+  body { min-height: 100vh; background: #d9cca8; }
+  .hero {
+    min-height: 100vh; height: auto;
+    padding: 0 16px 32px;
+    display: block; overflow: visible;
+  }
+  .frame { inset: 8px; border-color: rgba(43,36,22,.28); }
+  .frame::before, .frame::after {
+    width: 12px; height: 12px;
+  }
+
+  /* Nav — compact, hamburger */
+  .nav {
+    position: relative; top: auto; left: auto; right: auto;
+    padding: 20px 20px 16px; margin: 24px 0 0;
+    border-bottom: 1px solid rgba(43,36,22,.16);
+  }
+  .wordmark { font-size: 18px; }
+  .navlinks { display: none; }
+  .nav::after {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 14px;
+    background:
+      linear-gradient(var(--ink), var(--ink)) 0 0/100% 2px no-repeat,
+      linear-gradient(var(--ink), var(--ink)) 0 6px/100% 2px no-repeat,
+      linear-gradient(var(--ink), var(--ink)) 0 12px/100% 2px no-repeat;
+    opacity: .85;
+  }
+
+  /* Letter zone — natural flow */
+  .letter {
+    position: relative;
+    top: auto; left: auto; right: auto; bottom: auto;
+    padding: 36px 20px 0;
+    display: block; height: auto;
+  }
+  .kicker {
+    font-size: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .kicker i { width: 28px; }
+  h1 {
+    font-size: clamp(44px, 12vw, 60px);
+    line-height: 1.02;
+    margin-bottom: 24px;
+  }
+  .rule { margin-bottom: 24px; }
+  .lede {
+    font-size: 20px;
+    line-height: 1.4;
+    margin-bottom: 16px;
+  }
+  .note {
+    font-size: 14.5px;
+    max-width: 100%;
+    margin-bottom: 0;
+  }
+  .actions {
+    margin-top: 36px !important;
+    padding-top: 0 !important;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .btn {
+    flex: 1 1 100%;
+    justify-content: center;
+    min-height: 52px;
+  }
+  .link {
+    align-self: center;
+    padding: 6px 0 8px;
+  }
+  .service {
+    margin-top: 32px;
+    padding-top: 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 9.5px;
+    letter-spacing: .2em;
+  }
+  .service span { flex: 0 0 auto; text-align: left; }
+  .service span:nth-child(2) { color: var(--accent); }
+
+  /* Mobile — CHIP and PANEL removed entirely (Option 1) */
+  .chip,
+  .panel { display: none; }
+  .card-hd {
+    font-size: 9.5px;
+    margin-bottom: 14px;
+  }
+  .card-desc {
+    font-size: 15px;
+    line-height: 1.45;
+    margin-bottom: 18px;
+  }
+  .card-line {
+    padding: 10px 0;
+    font-size: 9.5px;
+    letter-spacing: .2em;
+  }
+  .panel-foot { font-size: 13px; }
+  .panel-foot::before { margin-bottom: 12px; }
+}
+@keyframes mobPanelIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; }
+  .frame,.nav,.kicker,h1 .a1,h1 .a2,.lede,.note,.actions,.panel,.seal,.panel-title,.panel-sub,.ornament,.panel-card,.panel-foot,.folio,.service{opacity:1;transform:none;}
+  .rule i{transform:scaleX(1);}
+  .curtain{display:none;}
+  .ornament path{stroke-dashoffset:0;}
+}
+</style>
+<link rel="stylesheet" href="./chic-full-sections.css">
+</head>
+<body id="top">
+<a class="mockup-back" href="/">← Retour au site</a>
+<div class="hero">
+  <div class="satin"></div>
+  <svg class="veins" viewBox="0 0 1440 900" preserveAspectRatio="none">
+    <defs><filter id="vb"><feGaussianBlur stdDeviation="1"/></filter></defs>
+    <path d="M-40 260 Q 400 285 800 265 T 1480 285" stroke="#b09860" stroke-width="1.2" fill="none" opacity=".38" filter="url(#vb)"/>
+    <path d="M-40 460 Q 500 485 900 465 T 1480 485" stroke="#c8a870" stroke-width="1.6" fill="none" opacity=".42" filter="url(#vb)"/>
+    <path d="M-40 680 Q 400 705 800 685 T 1480 705" stroke="#a08858" stroke-width="1" fill="none" opacity=".32" filter="url(#vb)"/>
+  </svg>
+  <div class="stone"></div>
+  <div class="grain"></div>
+  <div class="frame"></div>
+  <div class="curtain"></div>
+
+  <nav class="nav">
+    <div class="wordmark">Galat<em>e</em>e</div>
+    <div class="navlinks">
+      <a href="#menu">Menu</a><a href="#philosophie">Philosophie</a><a href="#reservation" class="active">Réservation</a><a href="#contact">Contact</a>
+    </div>
+    <button class="menu-toggle" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mobile-menu"><span aria-hidden="true"></span></button>
+  </nav>
+
+
+  <div class="letter">
+    <div class="kicker"><i></i><span>Maison de pâtes fraîches</span><span class="loc">— Hydra, Alger</span></div>
+    <h1>
+      <span class="a1">Ici, la pâte se roule</span>
+      <span class="a2">à la main.</span>
+    </h1>
+    <div class="rule"><i class="r1"></i><i class="r2"></i></div>
+    <p class="lede">Chaque tagliatelle est étirée, coupée et servie le jour même.</p>
+    <p class="note">Une cuisine simple, sans détour, portée par la saison et le geste. Nos plats changent au rythme des retours du marché.</p>
+    <div class="actions">
+      <a class="btn" href="#reservation"><span>Réserver une table</span><span>→</span></a>
+      <a class="link" href="#menu">Voir la carte</a>
+    </div>
+    <div class="service">
+      <span>Hydra — 36° 45′ N</span>
+      <span>Dès 19h · Mercredi–Samedi</span>
+      <span>+213 · Réservation conseillée</span>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <div class="panel-brand">
+      <svg class="ornament" viewBox="0 0 70 80" fill="none" stroke-width="1" stroke-linecap="round">
+        <g stroke="#c26a3d">
+          <path d="M35 78 C 35 60, 34 40, 35 8"/>
+          <path d="M32 10 C 33 4, 37 4, 38 10 C 37 13, 33 13, 32 10 Z"/>
+        </g>
+        <g stroke="#a8a075" opacity=".95">
+          <path d="M35 20 C 44 16, 52 18, 56 24 C 50 27, 42 25, 35 20 Z"/>
+          <path d="M35 20 C 26 16, 18 18, 14 24 C 20 27, 28 25, 35 20 Z"/>
+          <path d="M35 32 C 44 28, 52 30, 56 36 C 50 39, 42 37, 35 32 Z"/>
+          <path d="M35 32 C 26 28, 18 30, 14 36 C 20 39, 28 37, 35 32 Z"/>
+          <path d="M35 44 C 43 40, 50 42, 54 48 C 48 51, 41 49, 35 44 Z"/>
+          <path d="M35 44 C 27 40, 20 42, 16 48 C 22 51, 29 49, 35 44 Z"/>
+          <path d="M35 56 C 42 53, 47 54, 51 58 C 46 61, 40 59, 35 56 Z"/>
+          <path d="M35 56 C 28 53, 23 54, 19 58 C 24 61, 30 59, 35 56 Z"/>
+        </g>
+      </svg>
+      <div class="panel-title">Galat<em>e</em>e</div>
+      <div class="panel-sub">Est. 2026 · Hydra</div>
+    </div>
+
+    <div class="panel-card">
+      <div class="card-hd"><i></i>Carnet de service</div>
+      <p class="card-desc">Le soir prend le temps d'une pâte fraîche, étirée et dressée à la minute.</p>
+      <div class="card-line"><span class="k">Service</span><span class="v">Mer — Sam</span></div>
+      <div class="card-line"><span class="k">Horaires</span><span class="v">19h — 23h30</span></div>
+      <div class="card-line"><span class="k">Table</span><span class="v">2 à 8 couverts</span></div>
+      <div class="card-line"><span class="k">Chef</span><span class="v">Maison</span></div>
+    </div>
+
+    <div class="panel-foot">« Le temps d'une pâte. »</div>
+  </aside>
+</div>
+
+<nav class="mobile-menu" id="mobile-menu" aria-label="Navigation mobile">
+  <a href="#menu">La carte <small>01</small></a>
+  <a href="#philosophie">Philosophie <small>02</small></a>
+  <a href="#reservation">Réserver <small>03</small></a>
+  <a href="#contact">Contact <small>04</small></a>
+</nav>
+
+<main class="page-main">
+  <section class="menu-section" id="menu">
+    <div class="section-shell">
+      <header class="menu-intro reveal">
+        <span class="section-index">01 / 04</span>
+        <h2>La carte<br><em>du soir.</em></h2>
+        <div class="menu-intro-copy">
+          <p class="eyebrow">Pâtes fraîches</p>
+          <p>Trois assiettes façonnées chaque jour. Une carte courte, guidée par la saison.</p>
+        </div>
+      </header>
+
+      <div class="menu-list">
+        <article class="menu-item reveal">
+          <span class="menu-number">01</span>
+          <figure class="menu-media"><img src="/assets/menu-tagliolini.png" alt="Tagliolini au beurre noisette" loading="lazy"></figure>
+          <div class="menu-copy">
+            <p class="eyebrow">Pasta fresca · Signature</p>
+            <h3>Tagliolini,<br>beurre noisette</h3>
+            <p>Truffe noire, parmesan 36 mois et poivre concassé.</p>
+          </div>
+        </article>
+
+        <article class="menu-item reveal">
+          <span class="menu-number">02</span>
+          <figure class="menu-media"><img src="/assets/menu-ravioli.png" alt="Ravioli de courge et sauge" loading="lazy"></figure>
+          <div class="menu-copy">
+            <p class="eyebrow">Ripiena · Végétal</p>
+            <h3>Ravioli de courge,<br>sauge</h3>
+            <p>Noisette du Piémont et vinaigre de Xérès.</p>
+          </div>
+        </article>
+
+        <article class="menu-item reveal">
+          <span class="menu-number">03</span>
+          <figure class="menu-media"><img src="/assets/menu-tortelli.png" alt="Tortelli betterave et ricotta" loading="lazy"></figure>
+          <div class="menu-copy">
+            <p class="eyebrow">Ripiena · Saison</p>
+            <h3>Tortelli betterave<br>et ricotta</h3>
+            <p>Huile d'herbes, ricotta fraîche et citron confit.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="manifest-section" id="philosophie">
+    <span id="dish" aria-hidden="true"></span>
+    <article class="manifest-copy reveal">
+      <div class="manifest-brand"><i>G</i><span>Galatee</span></div>
+      <div class="manifest-copy-center">
+        <p class="eyebrow">Le geste avant tout · Hydra</p>
+        <h2>Une pâte.<br>Un geste.<br><em>Une saison.</em></h2>
+        <p>La pâte est pétrie, étirée et découpée sur place. Chaque sauce suit la même règle : peu d'éléments, une cuisson précise et juste assez de temps.</p>
+      </div>
+      <div class="manifest-foot"><span class="eyebrow">Maison de pâtes fraîches</span><span class="section-index">02 / 04</span></div>
+    </article>
+
+    <div class="ribbon-panel reveal" aria-hidden="true">
+      <span class="folio">Il gesto · 01</span>
+      <svg class="ribbon-drawing" viewBox="0 0 220 560" role="img" aria-label="Illustration linéaire d'un ruban de pâte">
+        <path d="M72 18 C169 48 170 110 79 145 C-1 176 18 239 119 268 C202 292 203 357 112 392 C22 427 30 488 154 540"/>
+        <path d="M112 18 C194 59 179 119 90 153 C24 179 37 225 130 254 C219 282 212 357 124 400 C53 435 66 493 174 530"/>
+        <path class="fine" d="M79 36 C145 63 145 104 85 129 M89 166 C42 187 57 219 124 240 M125 285 C180 307 176 347 120 374 M120 416 C73 445 91 482 158 512"/>
+        <path class="fine" d="M96 31 C161 65 157 112 88 139 M101 160 C43 186 54 231 130 258 M130 279 C193 306 186 355 120 388 M128 407 C66 441 79 491 169 521"/>
+      </svg>
+      <span class="vertical-note">Tagliatelle · roulée à la main</span>
+    </div>
+
+    <aside class="service-panel reveal">
+      <div class="service-topnav"><span>Service</span><span>Informations</span></div>
+      <div class="service-symbol">G</div>
+      <p class="eyebrow">Carnet de service</p>
+      <blockquote>Le soir prend le temps d'une pâte fraîche, étirée et dressée à la minute.</blockquote>
+      <div class="service-data">
+        <div><span>Service</span><strong>Mer. – Sam.</strong></div>
+        <div><span>Horaires</span><strong>19 h – 23 h 30</strong></div>
+        <div><span>Lieu</span><strong>Hydra, Alger</strong></div>
+      </div>
+      <div class="service-actions">
+        <a href="#reservation"><span>Réserver une table</span><span>↗</span></a>
+        <a href="#menu"><span>Voir la carte</span><span>↓</span></a>
+      </div>
+    </aside>
+  </section>
+
+  <section class="reservation-section" id="reservation">
+    <div class="section-shell reservation-grid">
+      <div class="reservation-copy reveal">
+        <p class="eyebrow">Votre soirée à Hydra</p>
+        <h2>Réserver<br>la table.</h2>
+        <p>Choisissez votre soirée. Chaque demande est relue par la maison avant confirmation.</p>
+        <div class="reservation-aside">
+          <div><span>Service</span><strong>Mer. à Sam.</strong></div>
+          <div><span>Horaires</span><strong>19 h à 23 h 30</strong></div>
+        </div>
+      </div>
+
+      <div class="booking reveal">
+        <div class="booking-head"><h3>Commençons par<br>votre table.</h3><span class="section-index">03 / 04</span></div>
+        <form class="booking-form" data-booking-form>
+          <div class="field"><label for="date">Date</label><input id="date" name="date" type="date" required></div>
+          <div class="field"><label for="guests">Couverts</label><select id="guests" name="guests" required><option value="">Choisir</option><option>2 personnes</option><option>3 personnes</option><option>4 personnes</option><option>5 personnes</option><option>6 personnes</option><option>7 personnes</option><option>8 personnes</option></select></div>
+          <div class="field"><label for="time">Heure</label><select id="time" name="time" required><option value="">Choisir</option><option>19 h 00</option><option>19 h 30</option><option>20 h 00</option><option>20 h 30</option><option>21 h 00</option><option>21 h 30</option></select></div>
+          <div class="field"><label for="name">Nom</label><input id="name" name="name" type="text" autocomplete="name" placeholder="Votre nom" required></div>
+          <div class="field full"><label for="contact-field">Téléphone ou email</label><input id="contact-field" name="contact" type="text" autocomplete="email" placeholder="Pour recevoir la confirmation" required></div>
+          <button class="booking-submit" type="submit"><span>Demander une table</span><span aria-hidden="true">↗</span></button>
+          <p class="booking-status" aria-live="polite" data-booking-status></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="information-section" id="informations">
+    <div class="section-shell information-grid">
+      <header class="information-heading reveal">
+        <p class="eyebrow">Informations</p>
+        <h2>Avant<br>la soirée.</h2>
+      </header>
+      <div class="information-rows">
+        <div class="information-row reveal"><strong>Ouverture</strong><p>Du mercredi au samedi, le soir uniquement.</p></div>
+        <div class="information-row reveal"><strong>Adresse</strong><p>Hydra, Alger. L'adresse exacte est communiquée avec la confirmation.</p></div>
+        <div class="information-row reveal"><strong>Régimes</strong><p>Options végétariennes à chaque service. Allergies à préciser lors de la demande.</p></div>
+        <div class="information-row reveal"><strong>Groupes</strong><p>Les demandes particulières sont étudiées directement avec la maison.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact-section" id="contact">
+    <div class="section-shell">
+      <div class="contact-top">
+        <h2 class="contact-title reveal">Galat<em>e</em>e</h2>
+        <div class="contact-details reveal">
+          <div><span>Téléphone</span><a href="tel:+213000000000">+213 · à confirmer</a></div>
+          <div><span>Email</span><a href="mailto:bonjour@galatee.dz">bonjour@galatee.dz</a></div>
+          <div><span>Adresse</span><strong>Hydra, Alger</strong></div>
+        </div>
+      </div>
+      <footer class="contact-foot"><span>Maison de pâtes fraîches · 2026</span><a href="#top">Retour en haut ↑</a></footer>
+    </div>
+  </section>
+</main>
+
+<script src="./chic-full-sections.js"></script>
+</body></html>

@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-display: "Antonio", "DM Sans", sans-serif;
+  --font-sans: "DM Sans", sans-serif;
+  --font-script: "Caveat", cursive;
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-accent: var(--accent);
+  --font-heading: "Antonio", "DM Sans", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Pasta by Galatée — Trattoria d'Alger (v2 — olive + rouge en harmonie) */
+  /* Tokens de marque */
+  --paper: #F5EFE4;         /* crème principale, surface page */
+  --paper-warm: #E9DFC9;    /* beige warm alternée */
+  --paper-deep: #E9DFC9;    /* alias legacy */
+  --ink: #1A1614;           /* encre pure, texte principal */
+  --ink-deep: #1A1614;      /* alias explicite */
+  --olive-deep: #2F3821;    /* olive profond, surface sombre cinématographique */
+  --olive: #4A5039;         /* olive moyen, dégradés */
+  --olive-lite: #6D6844;    /* Bancha, olive chaud clair */
+  --charcoal: #2F3821;      /* legacy → maintenant olive-deep */
+  --bordeaux: #7A1E24;      /* accent ponctuel très limité */
+  --smoke: #4A5039;         /* legacy → olive moyen */
+  --chrome: #E9DFC9;        /* alias legacy → paper-warm */
+  --accent: #D0362B;        /* rouge tomate, force égale à olive */
+  --tomato: #D0362B;        /* alias explicite */
+  --terracotta: #B4622E;    /* chaud, entre en scène ponctuellement */
+  --clay: #B4622E;          /* legacy → terracotta */
+  --basil: #3A6E42;         /* vert basilic, respiration */
+  --gold: #E8A652;          /* doré golden hour */
+  --hairline-dark: rgba(47, 56, 33, 0.18);
+  --hairline-light: rgba(245, 239, 228, 0.24);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  font-family: "DM Sans", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  /* Tokens shadcn light — mode clair */
+  --background: #F5EFE4;
+  --foreground: #1A1614;
+  --card: #F5EFE4;
+  --card-foreground: #1A1614;
+  --popover: #F5EFE4;
+  --popover-foreground: #1A1614;
+  --primary: #2F3821;
+  --primary-foreground: #F5EFE4;
+  --secondary: #E9DFC9;
+  --secondary-foreground: #1A1614;
+  --muted: #E9DFC9;
+  --muted-foreground: #4A5039;
+  --accent-foreground: #F5EFE4;
+  --destructive: #D0362B;
+  --border: rgba(47, 56, 33, 0.18);
+  --input: rgba(47, 56, 33, 0.22);
+  --ring: #D0362B;
+  --chart-1: #D0362B;
+  --chart-2: #4A5039;
+  --chart-3: #B4622E;
+  --chart-4: #E8A652;
+  --chart-5: #3A6E42;
+  --radius: 0.5rem;
+  --sidebar: #E9DFC9;
+  --sidebar-foreground: #1A1614;
+  --sidebar-primary: #2F3821;
+  --sidebar-primary-foreground: #F5EFE4;
+  --sidebar-accent: #F5EFE4;
+  --sidebar-accent-foreground: #1A1614;
+  --sidebar-border: rgba(47, 56, 33, 0.18);
+  --sidebar-ring: #D0362B;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: var(--paper); }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; }
+::selection { color: var(--paper); background: var(--accent); }
+
+.dark { --background: #2F3821; --foreground: #F5EFE4; --card: #2F3821; --card-foreground: #F5EFE4; --popover: #2F3821; --popover-foreground: #F5EFE4; --primary: #F5EFE4; --primary-foreground: #2F3821; --secondary: #1A1614; --secondary-foreground: #F5EFE4; --muted: #4A5039; --muted-foreground: #E9DFC9; --accent: #D0362B; --accent-foreground: #F5EFE4; --destructive: #D0362B; --border: rgba(245, 239, 228, 0.18); --input: rgba(245, 239, 228, 0.26); --ring: #D0362B; --sidebar: #2F3821; --sidebar-foreground: #F5EFE4; --sidebar-primary: #D0362B; --sidebar-primary-foreground: #F5EFE4; --sidebar-accent: #4A5039; --sidebar-accent-foreground: #F5EFE4; --sidebar-border: rgba(245, 239, 228, 0.18); --sidebar-ring: #D0362B; }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

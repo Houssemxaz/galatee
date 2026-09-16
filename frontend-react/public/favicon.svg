@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#F5EFE4"/>
+  <ellipse cx="32" cy="32" rx="24" ry="17" fill="none" stroke="#D0362B" stroke-width="4.5" stroke-linecap="round"/>
+  <text x="32" y="41" text-anchor="middle" font-family="Caveat, 'Comic Sans MS', cursive" font-weight="700" font-size="28" fill="#D0362B">P</text>
+</svg>

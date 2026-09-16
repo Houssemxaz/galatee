@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 120" role="img" aria-label="Solo al dente">
+  <defs>
+    <filter id="stamp-rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4"/>
+      <feDisplacementMap in="SourceGraphic" scale="2.6"/>
+    </filter>
+  </defs>
+  <g filter="url(#stamp-rough)" fill="none" stroke="#7A1E24" stroke-width="3" stroke-linecap="round">
+    <path d="M14 60 Q 14 12, 110 12 Q 206 12, 206 60 Q 206 108, 110 108 Q 14 108, 14 60 Z"/>
+    <path d="M22 60 Q 22 22, 110 22 Q 198 22, 198 60 Q 198 100, 110 100 Q 22 100, 22 60 Z" opacity=".5"/>
+  </g>
+  <text x="110" y="72" text-anchor="middle" font-family="Caveat, cursive" font-weight="700" font-style="italic" font-size="42" fill="#7A1E24">Solo al dente</text>
+</svg>

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2F3821" />
+    <meta name="description" content="Galatee, maison de pâtes fraîches et service du soir à Hydra, Alger." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" as="image" href="/assets/brand/box-pomodoro-steam.png" fetchpriority="high" />
+    <title>Galatee — Maison de pâtes fraîches</title>
+    <style>
+      html, body { margin: 0; padding: 0; }
+      #pbg-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(60% 40% at 50% 40%, rgba(232, 166, 82, 0.14) 0%, transparent 60%),
+          linear-gradient(160deg, #2F3821 0%, #3D452A 55%, #263019 100%);
+        color: #F5EFE4;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        transition: opacity 480ms cubic-bezier(0.23, 1, 0.32, 1),
+                    visibility 0s linear 480ms;
+      }
+      #pbg-splash.pbg-splash-out {
+        opacity: 0;
+        visibility: hidden;
+      }
+      .pbg-splash-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+      }
+      .pbg-splash-logo {
+        width: 132px;
+        height: 66px;
+        display: grid;
+        place-items: center;
+        border: 2.5px solid #F5EFE4;
+        border-radius: 999px;
+        font-family: "Segoe Script", "Comic Sans MS", cursive;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: #F5EFE4;
+        position: relative;
+        opacity: 0;
+        animation: pbgSplashLogoIn 620ms 80ms cubic-bezier(0.23, 1, 0.32, 1) forwards,
+                   pbgSplashPulse 2.4s 700ms ease-in-out infinite;
+      }
+      .pbg-splash-logo::after {
+        content: "by Galatée";
+        position: absolute;
+        left: 50%;
+        bottom: -18px;
+        transform: translateX(-50%);
+        font-family: "Segoe Script", "Comic Sans MS", cursive;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        color: rgba(245, 239, 228, 0.72);
+      }
+      .pbg-splash-dots {
+        display: flex;
+        gap: 8px;
+        margin-top: 22px;
+        opacity: 0;
+        animation: pbgSplashLogoIn 500ms 380ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+      .pbg-splash-dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #D0362B;
+        animation: pbgSplashDot 1.2s ease-in-out infinite;
+      }
+      .pbg-splash-dots span:nth-child(2) { animation-delay: 180ms; background: #E8A652; }
+      .pbg-splash-dots span:nth-child(3) { animation-delay: 360ms; background: #3A6E42; }
+      @keyframes pbgSplashLogoIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.94); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes pbgSplashPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(232, 166, 82, 0); }
+        50% { box-shadow: 0 0 0 12px rgba(232, 166, 82, 0.10); }
+      }
+      @keyframes pbgSplashDot {
+        0%, 60%, 100% { transform: translateY(0); opacity: 0.55; }
+        30% { transform: translateY(-8px); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .pbg-splash-logo, .pbg-splash-dots, .pbg-splash-dots span {
+          animation: none !important;
+          opacity: 1 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pbg-splash" aria-hidden="true">
+      <div class="pbg-splash-inner">
+        <div class="pbg-splash-logo">PASTA</div>
+        <div class="pbg-splash-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+    <div id="root"></div>
+    <script>
+      (function () {
+        var splash = document.getElementById("pbg-splash");
+        if (!splash) return;
+        var minShownAt = Date.now();
+        var MIN_MS = 600;
+        function hide() {
+          var elapsed = Date.now() - minShownAt;
+          var wait = Math.max(0, MIN_MS - elapsed);
+          setTimeout(function () {
+            splash.classList.add("pbg-splash-out");
+            setTimeout(function () { splash.remove(); }, 520);
+          }, wait);
+        }
+        if (document.readyState === "complete") {
+          hide();
+        } else {
+          window.addEventListener("load", hide, { once: true });
+        }
+        setTimeout(hide, 5000);
+      })();
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

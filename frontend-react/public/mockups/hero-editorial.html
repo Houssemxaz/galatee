@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Galatee — Direction éditoriale</title>
+<link rel="stylesheet" href="./shared.css">
+<style>
+:root{
+  --olive-deep:#3a3a1e;
+  --olive:#5c5a2e;
+  --olive-light:#8a8555;
+  --terra-deep:#7a3f22;
+  --terra:#a55a34;
+  --terra-bright:#c26a3d;
+  --cream:#f4ecd3;
+  --cream-warm:#efe1b8;
+  --ink:#1e1b12;
+  --display:"Cormorant Garamond",serif;
+  --body:"DM Sans",sans-serif;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+}
+html,body{width:100%;overflow-x:hidden;font-family:var(--body);color:var(--ink);}
+body{background:var(--cream-warm);}
+
+/* ═════════ DESKTOP ═════════ */
+.hero{position:relative;width:100%;height:100vh;min-height:820px;overflow:hidden;}
+
+/* Olive field — big, bottom-left, angled */
+.field-olive{
+  position:absolute;left:-8%;top:12%;width:75%;height:100%;
+  background:linear-gradient(155deg, var(--olive-deep) 0%, var(--olive) 60%, #6d6844 100%);
+  clip-path:polygon(0 0, 100% 15%, 92% 100%, 0 100%);
+  z-index:2;
+}
+/* Terracotta field — top-right, angled */
+.field-terra{
+  position:absolute;right:-8%;top:-6%;width:65%;height:75%;
+  background:linear-gradient(200deg, var(--terra-bright) 0%, var(--terra) 50%, var(--terra-deep) 100%);
+  clip-path:polygon(6% 0, 100% 0, 100% 88%, 12% 100%);
+  z-index:1;
+}
+/* Grain overlay for painterly feel */
+.grain{position:absolute;inset:0;z-index:5;opacity:.32;mix-blend-mode:overlay;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='2' seed='7'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* removed cream sliver — unused */
+.sliver{display:none;}
+
+/* Nav */
+.nav{position:absolute;top:40px;left:56px;right:56px;z-index:30;display:flex;justify-content:space-between;align-items:center;color:var(--cream);}
+.wordmark{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);}
+.wordmark em{font-style:italic;color:var(--terra);text-transform:none;letter-spacing:0;}
+.navlinks{display:flex;gap:36px;font-size:10.5px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--cream);text-shadow:0 1px 4px rgba(0,0,0,.25);}
+.navlinks .active{color:var(--cream-warm);}
+
+/* Folio top-right on terracotta */
+.folio{position:absolute;top:120px;right:70px;z-index:20;color:var(--cream);font-family:var(--display);font-style:italic;font-size:15px;letter-spacing:.06em;}
+.folio b{font-family:var(--body);font-style:normal;font-weight:600;font-size:9px;letter-spacing:.34em;text-transform:uppercase;display:block;margin-bottom:6px;color:var(--cream-warm);}
+
+/* Big title — breaks across the olive/terracotta transition */
+.title{position:absolute;top:31%;left:88px;z-index:20;max-width:720px;color:var(--cream);pointer-events:none;}
+.kicker{display:flex;align-items:center;gap:14px;font-size:10.5px;letter-spacing:.42em;text-transform:uppercase;color:var(--cream-warm);margin-bottom:26px;font-weight:600;}
+.kicker i{width:40px;height:1px;background:var(--terra-bright);}
+h1{font-family:var(--display);font-weight:500;font-size:108px;line-height:.96;letter-spacing:-.015em;color:var(--cream);text-shadow:0 2px 20px rgba(30,27,18,.35);}
+h1 em{font-style:italic;color:var(--cream-warm);}
+h1 .accent{color:var(--terra-bright);font-style:italic;}
+
+/* Copy block bottom-left over olive */
+.copy{position:absolute;bottom:130px;left:88px;z-index:20;max-width:400px;color:var(--cream);}
+.copy p{font-family:var(--display);font-style:italic;font-size:18px;line-height:1.55;color:var(--cream);margin-bottom:26px;}
+.actions{display:flex;gap:18px;align-items:center;}
+.btn{padding:16px 28px;background:var(--terra);color:var(--cream);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;border:0;cursor:pointer;transition:background .22s var(--ease-out), transform .18s var(--ease-out);text-decoration:none;display:inline-flex;align-items:center;gap:14px;}
+.btn:hover{background:var(--terra-bright);}
+.btn:active{transform:scale(.97);}
+.link{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;font-weight:600;color:var(--cream);border-bottom:1px solid var(--cream-warm);padding:6px 0 8px;cursor:pointer;text-decoration:none;transition:color .2s ease, border-color .2s ease;}
+.link:hover{color:var(--cream-warm);border-bottom-color:var(--terra-bright);}
+
+/* Botanical illustration — big, right-center, overlapping */
+.botanical{position:absolute;right:6%;top:24%;z-index:15;width:340px;height:560px;color:var(--cream-warm);pointer-events:none;}
+.botanical path, .botanical ellipse{transition:opacity .3s;}
+.caption{position:absolute;right:76px;bottom:110px;z-index:20;font-family:var(--display);font-style:italic;font-size:14px;color:var(--cream-warm);text-align:right;line-height:1.4;max-width:220px;}
+.caption b{font-family:var(--body);font-style:normal;font-weight:600;font-size:9px;letter-spacing:.34em;text-transform:uppercase;display:block;margin-bottom:6px;color:var(--terra-bright);}
+
+/* Info footer bottom-right (on cream zone in desktop) */
+.foot-info{position:absolute;bottom:56px;right:56px;z-index:20;font-size:10.5px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--olive-deep);display:flex;gap:24px;align-items:center;}
+.foot-info span:nth-child(2){color:var(--terra);opacity:.6;}
+
+/* ═════════ ANIMATIONS ═════════ */
+.field-olive{clip-path:polygon(0 0, 0 15%, 0 100%, 0 100%);animation:fieldOlive 1400ms 200ms var(--ease-out) forwards;}
+.field-terra{clip-path:polygon(100% 0, 100% 0, 100% 88%, 100% 100%);animation:fieldTerra 1400ms 350ms var(--ease-out) forwards;}
+.nav, .folio, .title, .copy, .botanical, .caption, .foot-info, .sliver { opacity:0; animation:riseIn 900ms var(--ease-out) forwards; }
+.nav{animation-delay:700ms;}
+.folio{animation-delay:1200ms;}
+.title{animation-delay:900ms;}
+.sliver{animation-delay:1100ms;}
+.botanical{animation-delay:1000ms;}
+.caption{animation-delay:1400ms;}
+.copy{animation-delay:1100ms;}
+.foot-info{animation-delay:1350ms;}
+.botanical path, .botanical ellipse{stroke-dasharray:400;stroke-dashoffset:400;animation:draw 1800ms 1100ms var(--ease-out) forwards;}
+
+@keyframes fieldOlive { to { clip-path:polygon(0 0, 100% 15%, 92% 100%, 0 100%); } }
+@keyframes fieldTerra { to { clip-path:polygon(6% 0, 100% 0, 100% 88%, 12% 100%); } }
+@keyframes riseIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+@keyframes draw { to { stroke-dashoffset:0; } }
+
+/* ═════════ MOBILE — CONÇU COMME UN MAGAZINE VERTICAL ═════════ */
+@media (max-width: 768px) {
+  html, body { height: auto; }
+  body { min-height: 100vh; background: var(--cream-warm); }
+  .hero {
+    height: auto; min-height: 100vh;
+    display: flex; flex-direction: column;
+    background: var(--cream-warm);
+    overflow: hidden;
+  }
+  /* Reset desktop color fields — mobile uses direct backgrounds on elements */
+  .field-olive, .field-terra, .sliver, .grain { display: none; }
+
+  /* ── NAV — olive zone top */
+  .nav {
+    position: relative; top: auto; left: auto; right: auto;
+    background: linear-gradient(160deg, var(--olive-deep) 0%, var(--olive) 100%);
+    padding: 28px 22px 24px;
+    order: 1;
+    color: var(--cream);
+  }
+  .wordmark { font-size: 18px; color: var(--cream); }
+  .wordmark em { color: var(--cream-warm); }
+  .navlinks { display: none; }
+  .nav::after {
+    content: "";
+    display: inline-block;
+    width: 22px; height: 14px;
+    background:
+      linear-gradient(var(--cream), var(--cream)) 0 0/100% 2px no-repeat,
+      linear-gradient(var(--cream), var(--cream)) 0 6px/100% 2px no-repeat,
+      linear-gradient(var(--cream), var(--cream)) 0 12px/100% 2px no-repeat;
+  }
+
+  /* ── FOLIO — olive continues */
+  .folio {
+    position: relative; top: auto; right: auto;
+    background: linear-gradient(160deg, var(--olive) 0%, var(--olive-deep) 100%);
+    padding: 8px 22px 40px;
+    order: 2;
+    color: var(--cream);
+    font-size: 13px;
+    text-align: left;
+  }
+  .folio b { font-size: 9px; color: var(--cream-warm); }
+
+  /* ── TITLE — big terracotta zone */
+  .title {
+    position: relative; top: auto; left: auto;
+    background: linear-gradient(180deg, var(--terra-deep) 0%, var(--terra) 60%, var(--terra-bright) 100%);
+    padding: 56px 22px 56px;
+    max-width: none;
+    order: 3;
+    color: var(--cream);
+    text-shadow: none;
+  }
+  .kicker { justify-content: flex-start; margin-bottom: 22px; font-size: 10px; color: var(--cream-warm); }
+  .kicker i { background: var(--cream-warm); width: 32px; }
+  h1 {
+    font-size: clamp(58px, 16vw, 84px);
+    line-height: .96;
+    color: var(--cream);
+    text-shadow: none;
+  }
+  h1 em { color: var(--cream-warm); }
+  h1 .accent { color: var(--cream-warm); }
+
+  /* ── BOTANICAL — cream zone with big illustration */
+  .botanical {
+    position: relative; right: auto; top: auto;
+    background: var(--cream-warm);
+    padding: 48px 22px 8px;
+    width: auto; height: auto;
+    max-width: none;
+    order: 4;
+    color: var(--terra);
+    align-self: stretch;
+    box-sizing: border-box;
+    display: block;
+    aspect-ratio: 1/1.4;
+    max-height: 380px;
+    margin: 0 auto;
+  }
+
+  /* ── CAPTION — small under botanical */
+  .caption {
+    position: relative; right: auto; bottom: auto;
+    background: var(--cream-warm);
+    padding: 0 22px 32px;
+    text-align: center; max-width: none;
+    order: 5;
+    color: var(--olive); font-size: 12px;
+  }
+  .caption b { color: var(--terra); }
+
+  /* ── COPY + CTA — cream zone */
+  .copy {
+    position: relative; bottom: auto; left: auto;
+    background: var(--cream-warm);
+    padding: 8px 22px 44px;
+    max-width: none;
+    order: 6;
+    color: var(--ink);
+  }
+  .copy p {
+    color: var(--ink); font-size: 18px; line-height: 1.5;
+    margin-bottom: 28px; text-align: center;
+  }
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .btn {
+    justify-content: center;
+    background: var(--olive-deep); color: var(--cream);
+    padding: 18px 24px; font-size: 11px;
+    min-height: 52px;
+  }
+  .btn:hover { background: var(--terra); }
+  .link {
+    color: var(--ink); border-bottom-color: var(--terra);
+    align-self: center; padding: 8px 0; text-align: center;
+  }
+
+  /* ── FOOT — olive zone bottom */
+  .foot-info {
+    position: relative; bottom: auto; right: auto;
+    background: linear-gradient(180deg, var(--olive) 0%, var(--olive-deep) 100%);
+    padding: 28px 22px;
+    order: 7;
+    color: var(--cream);
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    font-size: 10px; letter-spacing: .22em;
+  }
+  .foot-info span { flex: 0 0 auto; }
+  .foot-info span:nth-child(2) { display: none; }
+}
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .field-olive { clip-path: polygon(0 0, 100% 15%, 92% 100%, 0 100%); }
+  .field-terra { clip-path: polygon(6% 0, 100% 0, 100% 88%, 12% 100%); }
+  .nav,.folio,.title,.copy,.botanical,.caption,.foot-info,.sliver { opacity: 1; transform: none; }
+  .botanical path, .botanical ellipse { stroke-dashoffset: 0; }
+}
+</style></head>
+<body>
+<a class="mockup-back" href="/">← Retour au site</a>
+
+<div class="hero">
+  <div class="field-olive"></div>
+  <div class="field-terra"></div>
+  <div class="sliver"></div>
+  <div class="grain"></div>
+
+  <!-- NAV (mobile: inside zone-olive-mob via JS or grid; desktop: absolute) -->
+  <nav class="nav">
+    <div class="wordmark">Galat<em>e</em>e</div>
+    <div class="navlinks">
+      <span>Menu</span><span>Philosophie</span><span class="active">Réservation</span><span>Contact</span>
+    </div>
+  </nav>
+
+  <!-- FOLIO -->
+  <div class="folio">
+    <b>N° 01 — Salvia</b>
+    Hydra, Alger · MMXXVI
+  </div>
+
+  <!-- TITLE -->
+  <div class="title">
+    <div class="kicker"><i></i><span>Maison de pâtes fraîches</span></div>
+    <h1>La sauge,<br><em>l'olive,</em><br><span class="accent">le blé.</span></h1>
+  </div>
+
+  <!-- BOTANICAL — big sage sprig -->
+  <svg class="botanical" viewBox="0 0 340 560" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+    <!-- Central stem -->
+    <path d="M170 20 Q 165 200 175 400 T 170 540"/>
+    <!-- Flower buds top -->
+    <circle cx="170" cy="20" r="7" fill="currentColor" opacity=".8"/>
+    <circle cx="163" cy="46" r="5" fill="currentColor" opacity=".7"/>
+    <circle cx="177" cy="72" r="6" fill="currentColor" opacity=".7"/>
+    <!-- Big sage leaf right -->
+    <path d="M175 130 C 240 100 300 130 322 172 C 300 214 240 220 175 190 Z" fill="currentColor" fill-opacity=".08"/>
+    <path d="M175 130 Q 240 150 320 170"/>
+    <path d="M200 145 L285 165 M205 165 L285 178 M210 180 L275 195" stroke-width=".8" opacity=".7"/>
+    <!-- Big sage leaf left -->
+    <path d="M170 224 C 100 195 45 218 22 264 C 45 302 105 316 170 288 Z" fill="currentColor" fill-opacity=".08"/>
+    <path d="M170 224 Q 100 240 22 264"/>
+    <path d="M148 238 L60 258 M143 262 L65 278 M148 282 L70 292" stroke-width=".8" opacity=".7"/>
+    <!-- Medium leaf right -->
+    <path d="M175 320 C 235 305 285 328 302 358 C 285 390 235 396 175 375 Z" fill="currentColor" fill-opacity=".08"/>
+    <path d="M175 320 Q 235 342 300 358"/>
+    <!-- Small leaf left -->
+    <path d="M170 400 C 130 388 90 405 78 428 C 90 452 130 460 170 445 Z" fill="currentColor" fill-opacity=".08"/>
+    <path d="M170 400 Q 130 420 78 428"/>
+    <!-- Bottom bud -->
+    <circle cx="170" cy="540" r="5" fill="currentColor" opacity=".8"/>
+  </svg>
+
+  <!-- COPY / CTA -->
+  <div class="copy">
+    <p>Trois matières fondamentales. Une pâte tirée à la main, une huile infusée à froid, une feuille cueillie du matin.</p>
+    <div class="actions">
+      <a class="btn" href="#reservation">Réserver une table <span>→</span></a>
+      <a class="link" href="#menu">Voir la carte</a>
+    </div>
+  </div>
+
+  <!-- Caption for illustration -->
+  <div class="caption">
+    <b>Salvia officinalis</b>
+    Cueillie au petit matin,<br>hachée à la minute.
+  </div>
+
+  <!-- Foot info -->
+  <div class="foot-info">
+    <span>Hydra — 36° 45′ N</span>
+    <span>·</span>
+    <span>Mercredi — Samedi · Dès 19h</span>
+  </div>
+</div>
+</body></html>

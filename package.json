@@ -1,0 +1,17 @@
+{
+  "name": "galatee-reservations",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend-react run dev",
+    "build": "npm --prefix frontend-react run build",
+    "preview": "npm --prefix frontend-react run preview",
+    "start": "node backend/server.js",
+    "seed:demo": "node backend/seedDemo.js",
+    "test": "node --test backend/*.test.js"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

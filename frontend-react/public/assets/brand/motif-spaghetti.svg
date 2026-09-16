@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" role="img" aria-label="spaghetti">
+  <g fill="none" stroke="#D0362B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="100" cy="112" rx="72" ry="14"/>
+    <path d="M40 106 C 60 92, 90 90, 110 96 S 155 108, 170 100"/>
+    <path d="M46 100 C 68 80, 98 82, 122 90 S 158 96, 172 92"/>
+    <path d="M52 94 C 74 74, 108 76, 130 84 S 160 90, 168 84"/>
+    <path d="M60 88 C 84 68, 118 70, 138 78"/>
+    <path d="M70 82 C 92 66, 116 68, 132 74"/>
+    <path d="M118 34 L 118 74"/>
+    <path d="M112 34 L 112 62"/>
+    <path d="M124 34 L 124 62"/>
+    <path d="M108 34 L 132 34"/>
+    <path d="M108 34 L 108 22"/>
+    <path d="M132 34 L 132 22"/>
+  </g>
+  <g fill="none" stroke="#3A6E42" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M52 62 C 44 52, 44 40, 58 34 C 66 42, 66 54, 58 62 Z"/>
+    <path d="M52 62 L 58 34"/>
+  </g>
+</svg>

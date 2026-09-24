@@ -71,7 +71,7 @@ test("keeps commune fees editable and can deactivate a commune", (t) => {
   const updated = orders.updateCommune("hydra", { fee: 750, active: false });
   assert.equal(updated.feeCents, 75_000);
   assert.equal(updated.active, false);
-  assert.throws(() => orders.createOrder(body([{ productId: "tagliolini-beurre-noisette" }])), (error) => error.code === "COMMUNE_UNAVAILABLE");
+  assert.throws(() => orders.createOrder(body([{ productId: "spaghetti-pomodoro" }])), (error) => error.code === "COMMUNE_UNAVAILABLE");
 });
 
 test("orders published menus and offers with their catalogue type", (t) => {

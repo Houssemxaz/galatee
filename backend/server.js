@@ -92,6 +92,18 @@ export function createApp({
         });
       }
 
+      if (url.pathname === "/api/auth/request-password-reset" && request.method === "POST") {
+        const payload = await customerAuth.requestPasswordReset(await readJsonBody(request));
+        return sendJson(response, 202, payload);
+      }
+
+      if (url.pathname === "/api/auth/confirm-password-reset" && request.method === "POST") {
+        const result = customerAuth.confirmPasswordReset(await readJsonBody(request));
+        return sendJson(response, 200, { account: result.account }, {
+          "Set-Cookie": buildSessionCookie(result.sessionToken, request),
+        });
+      }
+
       if (url.pathname === "/api/auth/verify-code" && request.method === "POST") {
         const result = await customerAuth.verifyCode(await readJsonBody(request));
         return sendJson(response, 200, { account: result.account }, {
@@ -273,6 +285,12 @@ export function createApp({
       if (menuArchiveMatch && request.method === "DELETE") {
         assertAdminAuthorized(request, requiredAdminToken);
         return sendJson(response, 200, { menuItem: menu.archive(decodeURIComponent(menuArchiveMatch[1])) });
+      }
+
+      const menuRestoreMatch = url.pathname.match(/^\/api\/admin\/menu\/([^/]+)\/restore$/);
+      if (menuRestoreMatch && request.method === "POST") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { menuItem: menu.restore(decodeURIComponent(menuRestoreMatch[1])) });
       }
 
       const menuImageMatch = url.pathname.match(/^\/api\/admin\/menu\/([^/]+)\/image$/);
@@ -503,6 +521,10 @@ export function createApp({
 }
 
 function assertAdminAuthorized(request, requiredAdminToken) {
+  // Intentionally optional: with no token configured, admin routes are open.
+  // This is a deliberate convenience for local development (see the "Token
+  // admin optionnel" field in the back-office AuthGate screen) - set
+  // GALATEE_ADMIN_TOKEN before exposing this server publicly.
   if (!requiredAdminToken) return;
 
   const expectedHeader = `Bearer ${requiredAdminToken}`;
@@ -694,6 +716,14 @@ function sendText(response, status, message) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (!adminToken) {
+    console.warn(
+      "\nWarning: GALATEE_ADMIN_TOKEN is not set - every /api/admin/* route is " +
+      "reachable with no login right now. Fine for local testing; set a real " +
+      "token before this server is reachable from outside your own machine.\n",
+    );
+  }
+
   createApp().listen(port, () => {
     console.log(`Galatee reservation server listening on http://localhost:${port}`);
   });

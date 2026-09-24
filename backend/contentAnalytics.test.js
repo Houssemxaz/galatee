@@ -44,6 +44,40 @@ test("menu starts with published demo items and keeps draft changes private", as
   assert.equal(menu.listPublished().at(-1).price, "32.00");
 });
 
+test("menu items can be archived and restored, but not edited while archived", async (t) => {
+  const { menu } = await createSystems(t);
+  const created = menu.create({
+    title: "Pappardelle du marché",
+    shortDescription: "Sauce tomate fumée",
+    longDescription: "Une assiette de saison.",
+    price: "32",
+    category: "fresca",
+    sortOrder: 4,
+  });
+  menu.publish(created.id);
+
+  const archived = menu.archive(created.id);
+  assert.equal(archived.status, "archived");
+  assert.ok(archived.archivedAt);
+  assert.equal(menu.listPublished().some((item) => item.id === created.id), false);
+  assert.equal(menu.listAdmin({}).some((item) => item.id === created.id), false);
+  assert.equal(menu.listAdmin({ includeArchived: true }).some((item) => item.id === created.id), true);
+
+  assert.throws(() => menu.update(created.id, { title: "Nouveau nom" }), (error) => error.code === "MENU_ITEM_ARCHIVED");
+  assert.throws(() => menu.publish(created.id), (error) => error.code === "MENU_ITEM_ARCHIVED");
+
+  const restored = menu.restore(created.id);
+  assert.equal(restored.status, "draft");
+  assert.equal(restored.archivedAt, null);
+  assert.equal(menu.listAdmin({}).some((item) => item.id === created.id), true);
+  // Restoring must never re-publish it automatically - a customer shouldn't
+  // suddenly see something staff only meant to bring back for review.
+  assert.equal(menu.listPublished().some((item) => item.id === created.id), false);
+
+  assert.throws(() => menu.restore(created.id), (error) => error.code === "MENU_ITEM_NOT_ARCHIVED");
+});
+
+
 test("menu image upload validates bytes and creates a local generated asset path", async (t) => {
   const { menu, uploadRoot } = await createSystems(t);
   const item = menu.create({ title: "Image test", price: 1800, category: "fresca" });

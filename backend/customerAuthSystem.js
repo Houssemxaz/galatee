@@ -85,10 +85,22 @@ export class CustomerAuthSystem {
         last_seen_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS customer_password_resets (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_customer_login_codes_email_created
         ON customer_login_codes (email, created_at);
       CREATE INDEX IF NOT EXISTS idx_customer_sessions_customer_expiry
         ON customer_sessions (customer_id, expires_at);
+      CREATE INDEX IF NOT EXISTS idx_customer_password_resets_email_created
+        ON customer_password_resets (email, created_at);
     `);
     const accountColumns = this.db.prepare("PRAGMA table_info(customer_accounts)").all();
     if (!accountColumns.some((column) => column.name === "password_hash")) this.db.exec("ALTER TABLE customer_accounts ADD COLUMN password_hash TEXT");
@@ -265,6 +277,131 @@ export class CustomerAuthSystem {
     return this.createSession(mapAccountRow(this.db.prepare("SELECT * FROM customer_accounts WHERE id = ?").get(row.id)), now);
   }
 
+  // Same shape as requestCode()/verifyCode(): a hashed, expiring, rate-limited,
+  // one-time code - just for setting a new password instead of logging in.
+  async requestPasswordReset(input = {}) {
+    const email = normalizeEmail(input.email);
+    const now = this.now();
+    const nowIso = now.toISOString();
+
+    const account = this.db.prepare(
+      "SELECT id, first_name FROM customer_accounts WHERE email = ?",
+    ).get(email);
+
+    // Never reveal whether an account exists for this email - same
+    // non-leaking pattern as requestCode()'s "login" mode.
+    if (!account) {
+      return {
+        accepted: true,
+        message: "Si un compte correspond à cette adresse, un code de réinitialisation a été envoyé.",
+      };
+    }
+
+    const recentReset = this.db.prepare(`
+      SELECT id FROM customer_password_resets
+      WHERE email = ? AND created_at >= ?
+      ORDER BY created_at DESC LIMIT 1
+    `).get(email, new Date(now.getTime() - CODE_RESEND_COOLDOWN_MS).toISOString());
+    if (recentReset) {
+      throw new CustomerAuthError(
+        "AUTH_CODE_TOO_SOON",
+        "Please wait before requesting another code.",
+        429,
+        { retryAfterSeconds: Math.ceil(CODE_RESEND_COOLDOWN_MS / 1000) },
+      );
+    }
+
+    this.db.prepare(
+      "UPDATE customer_password_resets SET consumed_at = ? WHERE email = ? AND consumed_at IS NULL",
+    ).run(nowIso, email);
+
+    const code = String(randomInt(100000, 1000000));
+    const resetId = randomBytes(16).toString("hex");
+    this.db.prepare(`
+      INSERT INTO customer_password_resets (id, email, code_hash, attempts, expires_at, consumed_at, created_at)
+      VALUES (?, ?, ?, 0, ?, NULL, ?)
+    `).run(resetId, email, hashValue(code), new Date(now.getTime() + CODE_TTL_MS).toISOString(), nowIso);
+
+    try {
+      await (this.sendEmail
+        ? this.sendEmail({ to: email, code, mode: "reset", firstName: account.first_name })
+        : this.sendResetCodeViaBrevo({ to: email, code, firstName: account.first_name }));
+    } catch (error) {
+      this.db.prepare("DELETE FROM customer_password_resets WHERE id = ?").run(resetId);
+      if (error instanceof CustomerAuthError) throw error;
+      throw new CustomerAuthError("AUTH_EMAIL_SEND_FAILED", "The reset email could not be sent.", 503);
+    }
+
+    return {
+      accepted: true,
+      message: "Si un compte correspond à cette adresse, un code de réinitialisation a été envoyé.",
+      expiresInSeconds: CODE_TTL_MS / 1000,
+    };
+  }
+
+  confirmPasswordReset(input = {}) {
+    const email = normalizeEmail(input.email);
+    const code = String(input.code || "").trim();
+    const newPassword = normalizePassword(input.newPassword);
+    if (!/^\d{6}$/.test(code)) {
+      throw new CustomerAuthError("AUTH_CODE_INVALID", "The reset code is invalid.", 400);
+    }
+
+    const now = this.now();
+    const nowIso = now.toISOString();
+    const row = this.db.prepare(`
+      SELECT * FROM customer_password_resets
+      WHERE email = ? AND consumed_at IS NULL
+      ORDER BY created_at DESC LIMIT 1
+    `).get(email);
+    if (!row || row.expires_at <= nowIso) {
+      throw new CustomerAuthError("AUTH_CODE_INVALID", "The reset code is invalid or expired.", 400);
+    }
+    if (row.attempts >= MAX_CODE_ATTEMPTS) {
+      this.db.prepare("UPDATE customer_password_resets SET consumed_at = ? WHERE id = ?").run(nowIso, row.id);
+      throw new CustomerAuthError("AUTH_CODE_LOCKED", "Too many invalid code attempts.", 429);
+    }
+
+    const matches = timingSafeEqual(
+      Buffer.from(row.code_hash, "hex"),
+      Buffer.from(hashValue(code), "hex"),
+    );
+    if (!matches) {
+      const attempts = row.attempts + 1;
+      this.db.prepare(`
+        UPDATE customer_password_resets
+        SET attempts = ?, consumed_at = CASE WHEN ? >= ? THEN ? ELSE consumed_at END
+        WHERE id = ?
+      `).run(attempts, attempts, MAX_CODE_ATTEMPTS, nowIso, row.id);
+      throw new CustomerAuthError(
+        attempts >= MAX_CODE_ATTEMPTS ? "AUTH_CODE_LOCKED" : "AUTH_CODE_INVALID",
+        attempts >= MAX_CODE_ATTEMPTS ? "Too many invalid code attempts." : "The reset code is invalid.",
+        attempts >= MAX_CODE_ATTEMPTS ? 429 : 400,
+      );
+    }
+
+    this.db.prepare("UPDATE customer_password_resets SET consumed_at = ? WHERE id = ?").run(nowIso, row.id);
+
+    const account = this.db.prepare("SELECT * FROM customer_accounts WHERE email = ?").get(email);
+    if (!account) {
+      throw new CustomerAuthError("AUTH_ACCOUNT_NOT_FOUND", "No account matches this email.", 404);
+    }
+
+    const salt = randomBytes(16).toString("hex");
+    const hash = hashPassword(newPassword, salt);
+    this.db.prepare(
+      "UPDATE customer_accounts SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?",
+    ).run(hash, salt, nowIso, account.id);
+
+    // Logs them in with a fresh session, same as signup/verifyCode - and since
+    // createSession() below deletes any prior session for this customer first,
+    // this also kills any session an attacker might have been holding.
+    return this.createSession(
+      mapAccountRow(this.db.prepare("SELECT * FROM customer_accounts WHERE id = ?").get(account.id)),
+      now,
+    );
+  }
+
   createSession(account, now = this.now()) {
     const sessionToken = randomBytes(32).toString("hex");
     const sessionId = randomBytes(16).toString("hex");
@@ -302,6 +439,26 @@ export class CustomerAuthSystem {
   }
 
   async sendViaBrevo({ to, code, firstName }) {
+    return this.sendBrevoEmail({
+      to,
+      firstName,
+      subject: "Votre code de connexion Galatee",
+      text: `Votre code Galatee est ${code}. Il est valable 10 minutes.`,
+      html: `<p>Votre code Galatee est <strong>${code}</strong>.</p><p>Il est valable 10 minutes.</p>`,
+    });
+  }
+
+  async sendResetCodeViaBrevo({ to, code, firstName }) {
+    return this.sendBrevoEmail({
+      to,
+      firstName,
+      subject: "Réinitialisation de votre mot de passe Galatee",
+      text: `Votre code de réinitialisation Galatee est ${code}. Il est valable 10 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
+      html: `<p>Votre code de réinitialisation Galatee est <strong>${code}</strong>.</p><p>Il est valable 10 minutes.</p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`,
+    });
+  }
+
+  async sendBrevoEmail({ to, firstName, subject, text, html }) {
     if (!this.brevoApiKey || !this.mailFromEmail) {
       throw new CustomerAuthError(
         "AUTH_EMAIL_NOT_CONFIGURED",
@@ -319,9 +476,9 @@ export class CustomerAuthSystem {
       body: JSON.stringify({
         sender: { email: this.mailFromEmail, name: this.mailFromName },
         to: [{ email: to, name: firstName || undefined }],
-        subject: "Votre code de connexion Galatee",
-        textContent: `Votre code Galatee est ${code}. Il est valable 10 minutes.`,
-        htmlContent: `<p>Votre code Galatee est <strong>${code}</strong>.</p><p>Il est valable 10 minutes.</p>`,
+        subject,
+        textContent: text,
+        htmlContent: html,
       }),
     });
     if (!response.ok) {

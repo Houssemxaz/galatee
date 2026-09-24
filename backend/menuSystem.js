@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, parse as parsePath } from "node:path";
+import sharp from "sharp";
+
+const WEBP_VARIANT_WIDTHS = [640, 960];
+const WEBP_QUALITY = 82;
 
 const MENU_STATUSES = new Set(["draft", "published", "archived"]);
 const MENU_ITEM_TYPES = new Set(["dish", "menu", "offer"]);
@@ -12,42 +16,50 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const DEFAULT_MENU = [
   {
-    id: "tagliolini-beurre-noisette",
+    id: "spaghetti-pomodoro",
     itemType: "dish",
     category: "fresca",
     sortOrder: 1,
-    title: "Tagliolini, beurre noisette",
-    shortDescription: "Truffe noire, parmesan 36 mois",
-    longDescription: "Une pâte fine tirée chaque jour, nappée d'un beurre noisette aux notes de sous-bois. La truffe noire et le parmesan affiné apportent une profondeur nette, sans alourdir l'assiette.",
+    title: "Spaghetti Pomodoro",
+    shortDescription: "Tomates San Marzano, basilic frais, parmesan",
+    longDescription: "Sauce tomate mijotée aux San Marzano, spaghetti al dente, feuilles de basilic frais et copeaux de Parmigiano. Le classique italien, généreux et parfait.",
     priceCents: 2900,
-    imageUrl: "/assets/menu-tagliolini.png",
-    imageAlt: "Tagliolini frais avec truffe noire et parmesan",
+    imageUrl: "/assets/pasta-by-galatee/menu-spaghetti-pomodoro-v1.png",
+    imageAlt: "Spaghetti Pomodoro servi dans une box Pasta by Galatée",
   },
   {
-    id: "ravioli-courge-sauge",
+    id: "spaghetti-carbonara",
     itemType: "dish",
-    category: "vegetal",
+    category: "fresca",
     sortOrder: 2,
-    title: "Ravioli de courge, sauge",
-    shortDescription: "Noisette du Piémont, vinaigre de Xérès",
-    longDescription: "La courge rôtie est enveloppée dans une pâte souple, puis servie avec une sauge croustillante, la rondeur de la noisette et quelques gouttes de vinaigre de Xérès.",
+    title: "Spaghetti Carbonara",
+    shortDescription: "Guanciale, œuf, pecorino romano, poivre noir",
+    longDescription: "La vraie carbonara romaine : œuf soyeux, guanciale croustillant, pecorino romano bien affiné et poivre noir concassé. Ni crème, ni ail — juste l'essentiel.",
     priceCents: 2700,
-    imageUrl: "/assets/menu-ravioli.png",
-    imageAlt: "Ravioli de courge avec beurre de sauge et noisettes",
+    imageUrl: "/assets/pasta-by-galatee/menu-spaghetti-carbonara-v1.png",
+    imageAlt: "Spaghetti Carbonara servi dans une box Pasta by Galatée",
   },
   {
-    id: "tortelli-betterave-ricotta",
+    id: "tiramisu-me-up",
     itemType: "dish",
-    category: "ripiena",
+    category: "dolci",
     sortOrder: 3,
-    title: "Tortelli betterave & ricotta",
-    shortDescription: "Huile d'herbes, citron confit",
-    longDescription: "Une farce de betterave rôtie et ricotta fraîche, relevée par le citron confit. L'huile d'herbes termine le plat avec une fraîcheur végétale et précise.",
+    title: "Tiramisu me up",
+    shortDescription: "Mascarpone, café espresso, cacao, chocolat noir",
+    longDescription: "Notre tiramisu maison : mascarpone soyeux, biscuits imbibés d'espresso frais, cacao amer et éclats de chocolat noir. À emporter ou à savourer sur place.",
     priceCents: 2600,
-    imageUrl: "/assets/menu-tortelli.png",
-    imageAlt: "Tortelli de betterave et ricotta avec herbes fraîches",
+    imageUrl: "/assets/pasta-by-galatee/menu-tiramisu-v1.png",
+    imageAlt: "Tiramisu servi dans une box rectangulaire Pasta by Galatée",
   },
 ];
+
+// Migration: si la DB contient encore les anciens slugs, on les met à jour
+// vers les plats canoniques Pasta by Galatée.
+const LEGACY_MIGRATIONS = {
+  "tagliolini-beurre-noisette": "spaghetti-pomodoro",
+  "ravioli-courge-sauge": "spaghetti-carbonara",
+  "tortelli-betterave-ricotta": "tiramisu-me-up",
+};
 
 const IMAGE_SIGNATURES = [
   { mimeType: "image/jpeg", extension: ".jpg", matches: (data) => data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff },
@@ -74,6 +86,7 @@ export class MenuSystem {
     this.now = now;
     this.initializeSchema();
     this.seedDefaults();
+    this.migrateLegacyItems();
   }
 
   initializeSchema() {
@@ -132,6 +145,36 @@ export class MenuSystem {
     const timestamp = this.now().toISOString();
     this.runInTransaction(() => {
       for (const item of DEFAULT_MENU) {
+        const revisionId = randomUUID();
+        this.db.prepare(`
+          INSERT INTO menu_items (id, category, sort_order, status, draft_revision_id, published_revision_id, created_at, updated_at, published_at)
+          VALUES (?, ?, ?, 'published', ?, ?, ?, ?, ?)
+        `).run(item.id, item.category, item.sortOrder, revisionId, revisionId, timestamp, timestamp, timestamp);
+        this.insertRevision({ revisionId, itemId: item.id, item, createdAt: timestamp });
+      }
+    });
+  }
+
+  /**
+   * Migrate legacy Tagliolini/Ravioli/Tortelli rows to the canonical
+   * Pomodoro/Carbonara/Tiramisu items. Called at startup — safe to run
+   * repeatedly, only touches rows whose id appears in LEGACY_MIGRATIONS.
+   */
+  migrateLegacyItems() {
+    const legacyIds = Object.keys(LEGACY_MIGRATIONS);
+    if (legacyIds.length === 0) return;
+    const placeholders = legacyIds.map(() => "?").join(",");
+    const existing = this.db
+      .prepare(`SELECT id FROM menu_items WHERE id IN (${placeholders})`)
+      .all(...legacyIds);
+    if (existing.length === 0) return;
+    const timestamp = this.now().toISOString();
+    const delStmt = this.db.prepare("DELETE FROM menu_items WHERE id = ?");
+    const existsStmt = this.db.prepare("SELECT 1 FROM menu_items WHERE id = ?");
+    this.runInTransaction(() => {
+      for (const row of existing) delStmt.run(row.id);
+      for (const item of DEFAULT_MENU) {
+        if (existsStmt.get(item.id)) continue;
         const revisionId = randomUUID();
         this.db.prepare(`
           INSERT INTO menu_items (id, category, sort_order, status, draft_revision_id, published_revision_id, created_at, updated_at, published_at)
@@ -292,6 +335,20 @@ export class MenuSystem {
     return this.getAdmin(id);
   }
 
+  // The other side of archive(): brings an item back as a draft so staff can
+  // review and re-publish it deliberately, rather than it silently
+  // reappearing to customers the moment it's restored.
+  restore(id) {
+    const current = this.getAdmin(id);
+    if (current.status !== "archived") {
+      throw new MenuError("MENU_ITEM_NOT_ARCHIVED", "Only archived menu items can be restored.", 409);
+    }
+    const timestamp = this.now().toISOString();
+    this.db.prepare("UPDATE menu_items SET status = 'draft', archived_at = NULL, updated_at = ? WHERE id = ?")
+      .run(timestamp, id);
+    return this.getAdmin(id);
+  }
+
   setAvailability(id, available) {
     const current = this.getAdmin(id);
     if (current.status === "archived") throw new MenuError("MENU_ITEM_ARCHIVED", "Archived menu items cannot change availability.", 409);
@@ -307,10 +364,22 @@ export class MenuSystem {
       throw new MenuError("MENU_ITEM_ARCHIVED", "Archived menu items cannot receive images.", 409);
     }
     const image = validateImage(file);
-    const filename = `${randomUUID()}${image.extension}`;
+    const stem = randomUUID();
+    const filename = `${stem}${image.extension}`;
     await mkdir(this.uploadRoot, { recursive: true });
     const filePath = join(this.uploadRoot, filename);
     await writeFile(filePath, image.data, { flag: "wx" });
+
+    // Generate WebP srcset variants next to the original so <picture>
+    // can serve much smaller files without any manual step. Failure to
+    // generate a variant is logged but never blocks the upload — the
+    // original file remains valid on its own.
+    const variantPaths = await generateWebpVariants({
+      sourceData: image.data,
+      uploadRoot: this.uploadRoot,
+      stem,
+    });
+
     try {
       return this.update(id, {
         imageUrl: `${this.publicBasePath}/${filename}`,
@@ -318,6 +387,9 @@ export class MenuSystem {
       });
     } catch (error) {
       await unlink(filePath).catch(() => {});
+      for (const variantPath of variantPaths) {
+        await unlink(variantPath).catch(() => {});
+      }
       throw error;
     }
   }
@@ -425,6 +497,29 @@ function normalizePrice(value) {
     throw new MenuError("MENU_PRICE_INVALID", "Menu item price is too large.", 400);
   }
   return priceCents;
+}
+
+async function generateWebpVariants({ sourceData, uploadRoot, stem }) {
+  const paths = [];
+  try {
+    const meta = await sharp(sourceData).metadata();
+    const sourceWidth = meta.width || Infinity;
+    const widths = WEBP_VARIANT_WIDTHS.filter((w) => w <= sourceWidth);
+    if (widths.length === 0 && Number.isFinite(sourceWidth)) {
+      widths.push(sourceWidth);
+    }
+    for (const width of widths) {
+      const outPath = join(uploadRoot, `${stem}-${width}.webp`);
+      await sharp(sourceData)
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: WEBP_QUALITY, effort: 4 })
+        .toFile(outPath);
+      paths.push(outPath);
+    }
+  } catch (error) {
+    console.warn(`[menu.uploadImage] WebP variants failed for ${stem}: ${error.message}`);
+  }
+  return paths;
 }
 
 function validateImage(file) {

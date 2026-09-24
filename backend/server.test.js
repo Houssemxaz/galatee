@@ -6,10 +6,18 @@ import { ReservationSystem, SqliteReservationStore } from "./reservationSystem.j
 const fixedNow = () => new Date("2026-08-29T10:00:00.000Z");
 const wednesday = "2026-09-02";
 
+const TEST_ADMIN_TOKEN = "test-admin-token";
+
+// assertAdminAuthorized() now fails closed with no token configured, so every
+// test server needs a real one, and every /api/admin/* call needs this header.
+function adminAuthHeaders(extra = {}) {
+  return { Authorization: `Bearer ${TEST_ADMIN_TOKEN}`, ...extra };
+}
+
 async function createTestServer(t) {
   const store = new SqliteReservationStore();
   const system = new ReservationSystem({ store, now: fixedNow });
-  const server = createApp({ system });
+  const server = createApp({ system, requiredAdminToken: TEST_ADMIN_TOKEN });
 
   await new Promise((resolve) => server.listen(0, resolve));
   t.after(() => server.close());
@@ -105,14 +113,14 @@ test("HTTP requested reservations do not consume availability until admin confir
 
   const confirmFirstResponse = await fetch(`${baseUrl}/api/admin/reservations/${first.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(confirmFirstResponse.status, 200);
 
   const confirmSecondResponse = await fetch(`${baseUrl}/api/admin/reservations/${second.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(confirmSecondResponse.status, 409);
@@ -138,12 +146,12 @@ test("HTTP admin confirmation creates an automatic block and cancellation remove
 
   const confirmResponse = await fetch(`${baseUrl}/api/admin/reservations/${created.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(confirmResponse.status, 200);
 
-  const blocksAfterConfirmResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots?date=${wednesday}`);
+  const blocksAfterConfirmResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots?date=${wednesday}`, { headers: adminAuthHeaders() });
   const blocksAfterConfirm = await blocksAfterConfirmResponse.json();
   assert.equal(blocksAfterConfirm.blockedTimeSlots.length, 1);
   assert.equal(blocksAfterConfirm.blockedTimeSlots[0].tableType, "normal");
@@ -156,12 +164,12 @@ test("HTTP admin confirmation creates an automatic block and cancellation remove
 
   const cancelResponse = await fetch(`${baseUrl}/api/admin/reservations/${created.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "cancelled" }),
   });
   assert.equal(cancelResponse.status, 200);
 
-  const blocksAfterCancelResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots?date=${wednesday}`);
+  const blocksAfterCancelResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots?date=${wednesday}`, { headers: adminAuthHeaders() });
   const blocksAfterCancel = await blocksAfterCancelResponse.json();
   assert.equal(blocksAfterCancel.blockedTimeSlots.length, 0);
 });
@@ -178,7 +186,7 @@ test("HTTP admin confirmation returns 409 when a manual block collides", async (
 
   const blockResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       date: wednesday,
       time: "21:00",
@@ -190,7 +198,7 @@ test("HTTP admin confirmation returns 409 when a manual block collides", async (
 
   const confirmResponse = await fetch(`${baseUrl}/api/admin/reservations/${created.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(confirmResponse.status, 409);
@@ -212,7 +220,7 @@ test("HTTP admin API lists reservations and updates reservation status", async (
   });
   const created = await reservationResponse.json();
 
-  const listResponse = await fetch(`${baseUrl}/api/admin/reservations?date=${wednesday}`);
+  const listResponse = await fetch(`${baseUrl}/api/admin/reservations?date=${wednesday}`, { headers: adminAuthHeaders() });
   assert.equal(listResponse.status, 200);
   const listPayload = await listResponse.json();
   assert.equal(listPayload.reservations.length, 1);
@@ -220,7 +228,7 @@ test("HTTP admin API lists reservations and updates reservation status", async (
 
   const statusResponse = await fetch(`${baseUrl}/api/admin/reservations/${created.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(statusResponse.status, 200);
@@ -239,12 +247,12 @@ test("HTTP admin API exposes detailed availability filters", async (t) => {
 
   const confirmResponse = await fetch(`${baseUrl}/api/admin/reservations/${created.reservation.id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ status: "confirmed" }),
   });
   assert.equal(confirmResponse.status, 200);
 
-  const response = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=1&tableType=all&time=20:00`);
+  const response = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=1&tableType=all&time=20:00`, { headers: adminAuthHeaders() });
   assert.equal(response.status, 200);
   const payload = await response.json();
 
@@ -274,15 +282,15 @@ test("HTTP admin API exposes detailed availability filters", async (t) => {
 test("HTTP admin availability validates query filters", async (t) => {
   const baseUrl = await createTestServer(t);
 
-  const badDateResponse = await fetch(`${baseUrl}/api/admin/availability?date=02026-09-02&partySize=2&tableType=all`);
+  const badDateResponse = await fetch(`${baseUrl}/api/admin/availability?date=02026-09-02&partySize=2&tableType=all`, { headers: adminAuthHeaders() });
   assert.equal(badDateResponse.status, 400);
   assert.equal((await badDateResponse.json()).error.code, "DATE_INVALID");
 
-  const badTableTypeResponse = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=2&tableType=terrace`);
+  const badTableTypeResponse = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=2&tableType=terrace`, { headers: adminAuthHeaders() });
   assert.equal(badTableTypeResponse.status, 400);
   assert.equal((await badTableTypeResponse.json()).error.code, "TABLE_TYPE_INVALID");
 
-  const badTimeResponse = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=2&tableType=all&time=18:00`);
+  const badTimeResponse = await fetch(`${baseUrl}/api/admin/availability?date=${wednesday}&partySize=2&tableType=all&time=18:00`, { headers: adminAuthHeaders() });
   assert.equal(badTimeResponse.status, 422);
   assert.equal((await badTimeResponse.json()).error.code, "TIME_SLOT_INVALID");
 });
@@ -292,7 +300,7 @@ test("HTTP admin API blocks and unblocks typed time slots", async (t) => {
 
   const blockResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       date: wednesday,
       time: "19:30",
@@ -314,6 +322,7 @@ test("HTTP admin API blocks and unblocks typed time slots", async (t) => {
 
   const unblockResponse = await fetch(`${baseUrl}/api/admin/blocked-time-slots/${blockPayload.blockedTimeSlot.id}`, {
     method: "DELETE",
+    headers: adminAuthHeaders(),
   });
   assert.equal(unblockResponse.status, 200);
   assert.deepEqual(await unblockResponse.json(), { removed: true });
@@ -322,7 +331,7 @@ test("HTTP admin API blocks and unblocks typed time slots", async (t) => {
 test("HTTP admin API lists and updates recurring service table settings", async (t) => {
   const baseUrl = await createTestServer(t);
 
-  const servicesResponse = await fetch(`${baseUrl}/api/admin/services`);
+  const servicesResponse = await fetch(`${baseUrl}/api/admin/services`, { headers: adminAuthHeaders() });
   assert.equal(servicesResponse.status, 200);
   const servicesPayload = await servicesResponse.json();
   const wednesdayService = servicesPayload.services.find((service) => service.weekday === 3);
@@ -331,7 +340,7 @@ test("HTTP admin API lists and updates recurring service table settings", async 
 
   const updateResponse = await fetch(`${baseUrl}/api/admin/services/${wednesdayService.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       ...wednesdayService,
       normalTableCount: 3,
@@ -352,12 +361,12 @@ test("HTTP admin API lists and updates recurring service table settings", async 
 
 test("HTTP admin service update rejects invalid table settings", async (t) => {
   const baseUrl = await createTestServer(t);
-  const services = await (await fetch(`${baseUrl}/api/admin/services`)).json();
+  const services = await (await fetch(`${baseUrl}/api/admin/services`, { headers: adminAuthHeaders() })).json();
   const service = services.services.find((entry) => entry.weekday === 3);
 
   const response = await fetch(`${baseUrl}/api/admin/services/${service.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ normalTableCount: -1 }),
   });
   assert.equal(response.status, 400);
@@ -367,14 +376,14 @@ test("HTTP admin service update rejects invalid table settings", async (t) => {
 test("HTTP admin availability settings apply globally and special events override them", async (t) => {
   const baseUrl = await createTestServer(t);
 
-  const settingsResponse = await fetch(`${baseUrl}/api/admin/availability-settings`);
+  const settingsResponse = await fetch(`${baseUrl}/api/admin/availability-settings`, { headers: adminAuthHeaders() });
   assert.equal(settingsResponse.status, 200);
   const settingsPayload = await settingsResponse.json();
   assert.deepEqual(settingsPayload.settings.activeDays, [3, 4, 5, 6]);
 
   const updateSettingsResponse = await fetch(`${baseUrl}/api/admin/availability-settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       ...settingsPayload.settings,
       activeDays: [0, 1, 2, 3, 4, 5, 6],
@@ -413,7 +422,7 @@ test("HTTP admin availability settings apply globally and special events overrid
   for (const reservation of [firstTableReservation, secondTableReservation]) {
     const confirmationResponse = await fetch(`${baseUrl}/api/admin/reservations/${reservation.reservation.id}/status`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
       body: JSON.stringify({ status: "confirmed" }),
     });
     assert.equal(confirmationResponse.status, 200);
@@ -423,7 +432,7 @@ test("HTTP admin availability settings apply globally and special events overrid
 
   const conflictingSettingsResponse = await fetch(`${baseUrl}/api/admin/availability-settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({ ...updatedSettings.settings, activeDays: [3, 4, 5, 6] }),
   });
   assert.equal(conflictingSettingsResponse.status, 409);
@@ -431,7 +440,7 @@ test("HTTP admin availability settings apply globally and special events overrid
 
   const eventResponse = await fetch(`${baseUrl}/api/admin/availability-events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       name: "Dîner privé",
       dateFrom: "2026-09-01",
@@ -452,7 +461,7 @@ test("HTTP admin availability settings apply globally and special events overrid
 
   const overlapResponse = await fetch(`${baseUrl}/api/admin/availability-events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify({
       name: "Autre événement",
       dateFrom: "2026-09-02",
@@ -477,9 +486,9 @@ test("HTTP admin availability settings apply globally and special events overrid
   assert.equal(eventAvailability.timeSlots[0].time, "20:00");
   assert.equal(eventAvailability.timeSlots.at(-1).time, "23:00");
 
-  const deleteEventResponse = await fetch(`${baseUrl}/api/admin/availability-events/${eventPayload.event.id}`, { method: "DELETE" });
+  const deleteEventResponse = await fetch(`${baseUrl}/api/admin/availability-events/${eventPayload.event.id}`, { method: "DELETE", headers: adminAuthHeaders() });
   assert.equal(deleteEventResponse.status, 200);
-  const historyResponse = await fetch(`${baseUrl}/api/admin/availability-settings/history`);
+  const historyResponse = await fetch(`${baseUrl}/api/admin/availability-settings/history`, { headers: adminAuthHeaders() });
   assert.equal(historyResponse.status, 200);
   assert.ok((await historyResponse.json()).history.length >= 1);
   const revertedAvailabilityResponse = await fetch(`${baseUrl}/api/availability?date=2026-09-01&partySize=2&tableType=normal`);
@@ -524,6 +533,26 @@ test("HTTP admin API requires bearer auth when an admin token is configured", as
     },
   });
   assert.equal(authorizedResponse.status, 200);
+});
+
+test("HTTP admin API stays open when no admin token is configured at all (intentional)", async (t) => {
+  // Documents a deliberate choice, not an oversight: with GALATEE_ADMIN_TOKEN
+  // unset, admin routes are reachable with no login, matching the "Token
+  // admin optionnel" convenience described in the back-office AuthGate screen.
+  // Anyone changing this back to fail-closed should update this test on purpose.
+  const store = new SqliteReservationStore();
+  const system = new ReservationSystem({ store, now: fixedNow });
+  const server = createApp({ system, requiredAdminToken: "" });
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  t.after(() => server.close());
+  t.after(() => store.close());
+
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  const noHeaderResponse = await fetch(`${baseUrl}/api/admin/reservations`);
+  assert.equal(noHeaderResponse.status, 200);
 });
 
 test("HTTP API returns frontend-friendly validation errors", async (t) => {

@@ -13,6 +13,7 @@ import InformationsPage from "@/pages/InformationsPage";
 import ContactPage from "@/pages/ContactPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import AccountPage from "@/pages/AccountPage";
+import OrdersHistoryPage from "@/pages/OrdersHistoryPage";
 import PastaLoverClubPage from "@/pages/PastaLoverClubPage";
 import TableEntryPage from "@/pages/TableEntryPage";
 import { CustomerAuthProvider } from "@/context/CustomerAuthContext";
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="/reservation" element={<Navigate to="/commande" replace />} />
               <Route path="/pasta-lover-club" element={<PastaLoverClubPage />} />
               <Route path="/compte" element={<AccountPage />} />
+              <Route path="/compte/commandes" element={<OrdersHistoryPage />} />
               <Route path="/informations" element={<InformationsPage />} />
               <Route path="/contact" element={<ContactPage />} />
               <Route path="*" element={<NotFoundPage />} />

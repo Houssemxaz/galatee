@@ -1,28 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Check, Clock3, LogOut, Mail, MapPin, Phone, UserRound, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowUpRight, Check, Gift, LogOut, Mail, MapPin, Phone, Sparkles, UserPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Reveal from "@/components/Reveal";
-import GlowCard from "@/components/GlowCard";
 import ShineCTA from "@/components/ShineCTA";
 import SEO from "@/components/SEO";
 import { Link004 } from "@/components/ui/skiper-ui/skiper40";
 import { fetchCustomerOrders } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
-import useCountUp from "@/hooks/useCountUp";
-
-const ORDER_STATUS_LABELS = {
-  pending: "À confirmer",
-  confirmed: "Confirmée",
-  cancelled: "Annulée",
-  preparing: "En préparation",
-  ready: "Prête",
-  delivered: "Livrée",
-  withdrawn: "Retirée",
-  completed: "Terminée",
-};
 
 function errorMessage(error) {
   if (error?.code === "AUTH_CODE_TOO_SOON") return "Un code vient déjà d'être envoyé. Patientez une minute avant de recommencer.";
@@ -229,101 +215,47 @@ export function CustomerAccessForm() {
   );
 }
 
-function AccountStats({ upcoming, total, deliveries }) {
-  const upCount = useCountUp(upcoming, { duration: 900, delay: 120 });
-  const totalCount = useCountUp(total, { duration: 900, delay: 220 });
-  const delivCount = useCountUp(deliveries, { duration: 900, delay: 320 });
-  return (
-    <div className="account-profile-stats" aria-hidden="true">
-      <div><span>En cours</span><strong>{upCount}</strong></div>
-      <div><span>Total</span><strong>{totalCount}</strong></div>
-      <div><span>Livraisons</span><strong>{delivCount}</strong></div>
-    </div>
-  );
-}
+function LoyaltyMini({ loyalty }) {
+  if (!loyalty?.settings?.active) return null;
+  const threshold = loyalty.settings.threshold || 10;
+  const progress = loyalty.progressInCycle || 0;
+  const remaining = loyalty.ordersToNextReward || 0;
+  const percent = Math.min(100, (progress / threshold) * 100);
+  const reward = loyalty.rewardAvailable;
 
-function OrdersSummary({ upcoming, delivered, total }) {
-  const upCount = useCountUp(upcoming, { duration: 900, delay: 100 });
-  const delivCount = useCountUp(delivered, { duration: 900, delay: 200 });
-  const totalCount = useCountUp(total, { duration: 900, delay: 300 });
   return (
-    <div className="account-orders-summary">
-      <div><span>En cours</span><strong>{upCount}</strong></div>
-      <i />
-      <div><span>Livrées</span><strong>{delivCount}</strong></div>
-      <i />
-      <div><span>Total</span><strong>{totalCount}</strong></div>
-    </div>
-  );
-}
-
-const ORDER_STEPS = [
-  { key: "pending", label: "Reçue" },
-  { key: "confirmed", label: "Confirmée" },
-  { key: "preparing", label: "En prépa" },
-  { key: "ready", label: "Prête" },
-  { key: "delivered", label: "Livrée" },
-];
-const DELIVERED_KEYS = new Set(["delivered", "withdrawn", "completed"]);
-
-function OrderTimeline({ status }) {
-  const isCancelled = status === "cancelled";
-  const currentIndex = isCancelled
-    ? -1
-    : DELIVERED_KEYS.has(status)
-      ? ORDER_STEPS.length - 1
-      : ORDER_STEPS.findIndex((s) => s.key === status);
-  return (
-    <ol className={`order-timeline ${isCancelled ? "is-cancelled" : ""}`} aria-label="Progression de la commande">
-      {ORDER_STEPS.map((step, i) => {
-        const done = !isCancelled && i <= currentIndex;
-        const active = !isCancelled && i === currentIndex;
-        return (
-          <li key={step.key} className={`order-timeline-step ${done ? "is-done" : ""} ${active ? "is-active" : ""}`}>
-            <span className="order-timeline-dot" aria-hidden="true" />
-            <span className="order-timeline-label">{step.label}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function OrderRow({ order }) {
-  const itemSummary = order.items?.map((item) => `${item.quantity} × ${item.title}`).join(", ");
-  return (
-    <article className="account-reservation-row">
-      <div className="account-reservation-date"><span>{new Date(order.createdAt).toLocaleDateString("fr-FR")}</span></div>
-      <div className="account-reservation-main">
-        <h3>{order.deliveryMode === "delivery" ? `Livraison · ${order.communeName}` : "Retrait chez Galatée"}</h3>
-        <p>{itemSummary}</p>
-        <OrderTimeline status={order.status} />
+    <div className={`pbg-carnet-loyalty ${reward ? "is-reward" : ""}`}>
+      <div className="pbg-carnet-loyalty-head">
+        <span className="pbg-carnet-loyalty-icon" aria-hidden="true">
+          {reward ? <Gift size={16} strokeWidth={1.7} /> : <Sparkles size={16} strokeWidth={1.7} />}
+        </span>
+        <span className="pbg-carnet-loyalty-eyebrow">Programme fidélité</span>
       </div>
-      <span className={`account-status account-status-${order.status}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
-    </article>
+      <p className="pbg-carnet-loyalty-text">
+        {reward
+          ? reward.title
+          : <>Plus que <strong>{remaining} commande{remaining > 1 ? "s" : ""}</strong> avant votre promo.</>}
+      </p>
+      <div className="pbg-carnet-loyalty-track" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+      <p className="pbg-carnet-loyalty-count">{progress} / {threshold} commandes</p>
+    </div>
   );
 }
 
 export default function AccountPage() {
   const { account, loading, logout } = useCustomerAuth();
-  const [searchParams] = useSearchParams();
-  const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
-  const [orders, setOrders] = useState([]);
   const [loyalty, setLoyalty] = useState(null);
-  const [orderState, setOrderState] = useState("idle");
 
   useEffect(() => {
     if (!account) return undefined;
     let cancelled = false;
-    setOrderState("loading");
     fetchCustomerOrders()
-      .then((payload) => { if (!cancelled) { setOrders(payload.orders || []); setLoyalty(payload.loyalty || null); setOrderState("ready"); } })
-      .catch(() => { if (!cancelled) setOrderState("error"); });
+      .then((payload) => { if (!cancelled) setLoyalty(payload.loyalty || null); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [account]);
-
-  const upcoming = useMemo(() => orders.filter((order) => !["cancelled", "completed"].includes(order.status)), [orders]);
-  const past = useMemo(() => orders.filter((order) => !upcoming.includes(order)), [orders, upcoming]);
 
   if (loading) return <div className="page page-account pbg-page pbg-page-cream"><div className="pbg-page-shell account-loading">Chargement de votre espace…</div></div>;
 
@@ -348,98 +280,66 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="page page-account pbg-page pbg-page-cream page-account-member">
+    <div className="page pbg-page pbg-account-page">
       <SEO
         title="Mon espace client"
-        description="Retrouvez vos commandes, votre programme fidélité et vos coordonnées Pasta by Galatée."
+        description="Retrouvez vos coordonnées et votre programme fidélité Pasta by Galatée."
         path="/compte"
         noIndex
       />
-      <section className="pbg-page-header">
+
+      <section className="pbg-account-hero">
         <div className="pbg-page-shell">
-          <p className="pbg-page-kicker"><span>Votre espace Galatée</span></p>
-          <h1 className="pbg-page-title">Bonjour,<br /><em>{account.firstName}.</em></h1>
-          <p className="pbg-page-lede">Retrouvez vos coordonnées et le fil de vos commandes.</p>
+          <Reveal>
+            <p className="pbg-account-eyebrow">Votre espace Galatée</p>
+            <h1 className="pbg-account-title">
+              Bonjour,<br /><em>{account.firstName}.</em>
+            </h1>
+            <p className="pbg-account-lede">Votre carnet est prêt. Commandez quand vous voulez.</p>
+          </Reveal>
         </div>
       </section>
-      <section className="page-shell account-member-layout">
-        <Reveal className="account-profile">
-          <p className="account-side-tag">Votre carnet</p>
-          <h2 className="account-profile-name">{account.firstName} {account.lastName}</h2>
-          <AccountStats
-            upcoming={upcoming.length}
-            total={orders.length}
-            deliveries={orders.filter((o) => o.deliveryMode === "delivery").length}
-          />
-          <ul className="account-profile-contacts">
-            <li>
-              <span className="account-contact-icon"><Mail size={14} strokeWidth={1.8} /></span>
-              <div><small>Email</small><strong>{account.email}</strong></div>
-            </li>
-            <li>
-              <span className="account-contact-icon"><Phone size={14} strokeWidth={1.8} /></span>
-              <div><small>Téléphone</small><strong>{account.phone}</strong></div>
-            </li>
-            <li>
-              <span className="account-contact-icon"><MapPin size={14} strokeWidth={1.8} /></span>
-              <div><small>Résidence</small><strong>{account.residenceCommune || "Non renseignée"}</strong></div>
-            </li>
-          </ul>
-          <p className="account-profile-note">Vos coordonnées sont proposées automatiquement lors de votre prochaine commande.</p>
-          {loyalty?.settings?.active && (loyalty.rewardAvailable
-            ? <GlowCard className="account-loyalty-card"><div className="account-loyalty-heading"><span>Programme fidélité</span><strong>{loyalty.qualifyingOrders} commande{loyalty.qualifyingOrders > 1 ? "s" : ""}</strong></div><p>{loyalty.rewardAvailable.title}</p><div className="account-loyalty-track" aria-hidden="true"><span style={{ width: "100%" }} /></div></GlowCard>
-            : <div className="account-loyalty-card"><div className="account-loyalty-heading"><span>Programme fidélité</span><strong>{loyalty.qualifyingOrders} commande{loyalty.qualifyingOrders > 1 ? "s" : ""}</strong></div><p>{loyalty.ordersToNextReward} commande{loyalty.ordersToNextReward > 1 ? "s" : ""} avant votre récompense</p><div className="account-loyalty-track" aria-hidden="true"><span style={{ width: `${Math.min(100, (loyalty.progressInCycle / loyalty.settings.threshold) * 100)}%` }} /></div></div>
-          )}
-          <button type="button" className="account-logout" onClick={logout}><LogOut size={13} strokeWidth={1.7} /> Se déconnecter</button>
-        </Reveal>
-        <Reveal className="account-reservations" delay={100}>
-          <div className="account-section-heading">
-            <div>
-              <p className="account-side-tag">Vos commandes</p>
-              <h2 className="account-reservations-title">Le fil de vos commandes.</h2>
-            </div>
-            <Link className="action-button account-new-reservation" to="/commande">Nouvelle commande <ArrowUpRight size={14} /></Link>
-          </div>
-          {orderState === "ready" && orders.length > 0 && (
-            <OrdersSummary
-              upcoming={upcoming.length}
-              delivered={orders.filter((o) => ["delivered", "withdrawn", "completed"].includes(o.status)).length}
-              total={orders.length}
-            />
-          )}
-          {orderState === "loading" && <p className="account-state">Chargement de vos commandes...</p>}
-          {orderState === "error" && <p className="account-state account-state-error">Impossible de charger vos commandes pour le moment.</p>}
-          {orderState === "ready" && !orders.length && (
-            <div className="account-empty">
-              <Clock3 size={22} strokeWidth={1.5} />
-              <h3>Votre carnet est encore ouvert.</h3>
-              <p>Votre prochaine commande à Hydra commence par un plat.</p>
-              <Link className="text-link" to="/commande">Passer une commande <ArrowUpRight size={14} /></Link>
-            </div>
-          )}
-          {upcoming.length > 0 && <div className="account-reservation-group"><p className="account-group-label">En cours</p>{upcoming.map((order) => <OrderRow key={order.id} order={order} />)}</div>}
-          {past.length > 0 && <div className="account-reservation-group"><p className="account-group-label">Historique</p>{past.map((order) => <OrderRow key={order.id} order={order} />)}</div>}
-        </Reveal>
-      </section>
 
-      <section className="pbg-section pbg-section-bordeaux pbg-account-club">
+      <section className="pbg-account-body">
         <div className="pbg-page-shell">
-          <div className="pbg-section-index pbg-section-index-light">
-            <span>+</span><i />Pasta Lover Club
-          </div>
-          <h2 className="pbg-section-title pbg-section-title-light">
-            Chaque plat,
-            <br /><em>une récompense.</em>
-          </h2>
-          <p className="pbg-section-lede pbg-section-lede-light">
-            Tous les 10 plats commandés, un dessert offert. Toutes les 5 commandes livrées, la prochaine livraison est offerte. Bientôt : cadeaux d'anniversaire et surprises maison.
-          </p>
-          <div className="pbg-account-club-actions">
-            <Link to="/pasta-lover-club" className="pbg-btn pbg-btn-light">
-              <span>Découvrir le club</span>
-              <ArrowUpRight size={16} strokeWidth={1.6} />
-            </Link>
-          </div>
+          <Reveal className="pbg-carnet-card">
+            <div className="pbg-carnet-head">
+              <p className="pbg-carnet-eyebrow">Votre carnet</p>
+              <h2 className="pbg-carnet-name">{account.firstName} {account.lastName}</h2>
+            </div>
+
+            <ul className="pbg-carnet-contacts">
+              <li>
+                <span className="pbg-carnet-icon"><Mail size={15} strokeWidth={1.7} /></span>
+                <div><small>Email</small><strong>{account.email}</strong></div>
+              </li>
+              <li>
+                <span className="pbg-carnet-icon"><Phone size={15} strokeWidth={1.7} /></span>
+                <div><small>Téléphone</small><strong>{account.phone}</strong></div>
+              </li>
+              <li>
+                <span className="pbg-carnet-icon"><MapPin size={15} strokeWidth={1.7} /></span>
+                <div><small>Résidence</small><strong>{account.residenceCommune || "Non renseignée"}</strong></div>
+              </li>
+            </ul>
+
+            <LoyaltyMini loyalty={loyalty} />
+
+            <div className="pbg-carnet-actions">
+              <Link to="/compte/commandes" className="pbg-btn pbg-btn-primary pbg-carnet-cta">
+                <span>Mes commandes</span>
+                <ArrowUpRight size={16} strokeWidth={1.6} />
+              </Link>
+              <Link to="/commande" className="pbg-carnet-secondary">
+                <span>Nouvelle commande</span>
+                <ArrowUpRight size={14} strokeWidth={1.8} />
+              </Link>
+            </div>
+
+            <button type="button" className="pbg-carnet-logout" onClick={logout}>
+              <LogOut size={13} strokeWidth={1.7} /> Se déconnecter
+            </button>
+          </Reveal>
         </div>
       </section>
     </div>

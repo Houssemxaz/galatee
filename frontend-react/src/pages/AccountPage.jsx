@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Check, Clock3, LogOut, Mail, MapPin, Phone, UserRound } from "lucide-react";
+import { ArrowUpRight, Check, Clock3, LogOut, Mail, MapPin, Phone, UserRound, UserPlus } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Reveal from "@/components/Reveal";
+import GlowCard from "@/components/GlowCard";
+import ShineCTA from "@/components/ShineCTA";
+import SEO from "@/components/SEO";
+import { Link004 } from "@/components/ui/skiper-ui/skiper40";
 import { fetchCustomerOrders } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import useCountUp from "@/hooks/useCountUp";
@@ -30,18 +34,30 @@ function errorMessage(error) {
   return error?.message || "Une erreur est survenue. Réessayez dans un instant.";
 }
 
+const SUBMIT_LABELS = {
+  signup: "Créer mon compte",
+  login: "Se connecter",
+  forgot: "Envoyer le code",
+  reset: "Réinitialiser le mot de passe",
+};
+
 export function CustomerAccessForm() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { createAccount, login } = useCustomerAuth();
-  const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
-  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", residenceCommune: "", password: "", passwordConfirm: "" });
+  const { createAccount, login, requestPasswordReset, confirmPasswordReset } = useCustomerAuth();
+  const rawMode = searchParams.get("mode");
+  const mode = ["signup", "forgot", "reset"].includes(rawMode) ? rawMode : "login";
+  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "", email: "", residenceCommune: "", password: "", passwordConfirm: "", code: "" });
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setForm((current) => ({ ...current, password: "", passwordConfirm: "" }));
+    setForm((current) => ({ ...current, password: "", passwordConfirm: "", code: "" }));
     setError("");
+    // Keep the neutral confirmation visible on the reset screen after the switch
+    // from "forgot"; clear it everywhere else so a stale message never lingers.
+    if (mode !== "reset") setInfo("");
   }, [mode]);
 
   function update(name, value) {
@@ -55,12 +71,23 @@ export function CustomerAccessForm() {
   async function submit(event) {
     event.preventDefault();
     setError("");
-    if (mode === "signup" && form.password !== form.passwordConfirm) { setError("Les mots de passe ne correspondent pas."); return; }
+    if ((mode === "signup" || mode === "reset") && form.password !== form.passwordConfirm) {
+      setError("Les mots de passe ne correspondent pas."); return;
+    }
     setSubmitting(true);
     try {
-      if (mode === "signup") await createAccount(form);
-      else await login({ email: form.email, password: form.password });
-      navigate("/compte", { replace: true });
+      if (mode === "signup") { await createAccount(form); navigate("/compte", { replace: true }); }
+      else if (mode === "login") { await login({ email: form.email, password: form.password }); navigate("/compte", { replace: true }); }
+      else if (mode === "forgot") {
+        // Enumeration protection: same 202 whether or not the email matches.
+        try { await requestPasswordReset({ email: form.email }); } catch { /* intentionally silent */ }
+        setInfo("Si un compte correspond à cette adresse, un code de réinitialisation a été envoyé. Vérifiez votre boîte mail.");
+        setSearchParams({ mode: "reset" });
+      }
+      else if (mode === "reset") {
+        await confirmPasswordReset({ email: form.email, code: form.code, newPassword: form.password });
+        navigate("/compte", { replace: true });
+      }
     } catch (submitError) {
       setError(errorMessage(submitError));
     } finally {
@@ -68,19 +95,135 @@ export function CustomerAccessForm() {
     }
   }
 
+  const isRecoveryMode = mode === "forgot" || mode === "reset";
+  const showsIdentity = mode === "signup";
+  const showsEmail = true;
+  const showsCode = mode === "reset";
+  const showsPassword = mode === "signup" || mode === "login" || mode === "reset";
+  const showsPasswordConfirm = mode === "signup" || mode === "reset";
+  const passwordLabel = mode === "reset" ? "Nouveau mot de passe" : "Mot de passe";
+  const passwordConfirmLabel = mode === "reset" ? "Confirmer le nouveau mot de passe" : "Confirmer le mot de passe";
+
   return (
     <div className="account-access-panel">
+      <header className="account-access-head">
+        <p className="account-access-eyebrow">Espace client</p>
+        <h1 className="account-access-headline">Votre espace.</h1>
+      </header>
+
+      <div className="account-access-promo">
+        <span className="account-access-promo-icon" aria-hidden="true">🎁</span>
+        <p><b>10 commandes = 1 récompense.</b> Votre compte démarre le compteur.</p>
+      </div>
+
+      {!isRecoveryMode && (
+        <div className="account-mode-tabs" role="tablist" aria-label="Mode d'accès">
+          <button
+            role="tab"
+            type="button"
+            aria-selected={mode === "login"}
+            className={`account-mode-tab ${mode === "login" ? "is-active" : ""}`}
+            onClick={() => switchMode("login")}
+          >
+            <Check size={14} strokeWidth={2.2} />
+            <span>Se connecter</span>
+          </button>
+          <button
+            role="tab"
+            type="button"
+            aria-selected={mode === "signup"}
+            className={`account-mode-tab ${mode === "signup" ? "is-active" : ""}`}
+            onClick={() => switchMode("signup")}
+          >
+            <UserPlus size={14} strokeWidth={2} />
+            <span>Créer un compte</span>
+          </button>
+        </div>
+      )}
+
+      {isRecoveryMode && (
+        <p className="account-recovery-eyebrow">
+          {mode === "forgot" ? "01 · Mot de passe oublié" : "02 · Nouveau mot de passe"}
+        </p>
+      )}
+
       <form className="account-form" onSubmit={submit}>
-        <div className="account-form-progress"><span className="is-active">{mode === "signup" ? "01 · Créer votre compte" : "01 · Se connecter"}</span></div>
-        {mode === "signup" && <div className="account-form-row"><div className="account-field"><Label htmlFor="account-first-name">Prénom</Label><Input id="account-first-name" value={form.firstName} onChange={(event) => update("firstName", event.target.value)} autoComplete="given-name" required /></div><div className="account-field"><Label htmlFor="account-last-name">Nom</Label><Input id="account-last-name" value={form.lastName} onChange={(event) => update("lastName", event.target.value)} autoComplete="family-name" required /></div></div>}
-        {mode === "signup" && <div className="account-field"><Label htmlFor="account-phone">Téléphone</Label><Input id="account-phone" type="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} autoComplete="tel" required /></div>}
-        {mode === "signup" && <div className="account-field"><Label htmlFor="account-residence">Commune de résidence</Label><Input id="account-residence" value={form.residenceCommune} onChange={(event) => update("residenceCommune", event.target.value)} autoComplete="address-level2" required /></div>}
-        <div className="account-field"><Label htmlFor="account-email">Email</Label><Input id="account-email" type="email" value={form.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" required /></div>
-        <div className="account-field"><Label htmlFor="account-password">Mot de passe</Label><Input id="account-password" type="password" value={form.password} onChange={(event) => update("password", event.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={8} required /></div>
-        {mode === "signup" && <div className="account-field"><Label htmlFor="account-password-confirm">Confirmer le mot de passe</Label><Input id="account-password-confirm" type="password" value={form.passwordConfirm} onChange={(event) => update("passwordConfirm", event.target.value)} autoComplete="new-password" minLength={8} required /></div>}
+        {showsIdentity && (
+          <div className="account-form-row">
+            <div className="account-field">
+              <Label htmlFor="account-first-name">Prénom</Label>
+              <Input id="account-first-name" value={form.firstName} onChange={(event) => update("firstName", event.target.value)} autoComplete="given-name" required />
+            </div>
+            <div className="account-field">
+              <Label htmlFor="account-last-name">Nom</Label>
+              <Input id="account-last-name" value={form.lastName} onChange={(event) => update("lastName", event.target.value)} autoComplete="family-name" required />
+            </div>
+          </div>
+        )}
+        {showsIdentity && (
+          <div className="account-form-row">
+            <div className="account-field">
+              <Label htmlFor="account-phone">Téléphone</Label>
+              <Input id="account-phone" type="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} autoComplete="tel" required />
+            </div>
+            <div className="account-field">
+              <Label htmlFor="account-residence">Commune de résidence</Label>
+              <Input id="account-residence" value={form.residenceCommune} onChange={(event) => update("residenceCommune", event.target.value)} autoComplete="address-level2" required />
+            </div>
+          </div>
+        )}
+        {showsEmail && (
+          <div className="account-field">
+            <Label htmlFor="account-email">Email</Label>
+            <Input id="account-email" type="email" value={form.email} onChange={(event) => update("email", event.target.value)} autoComplete="email" required />
+          </div>
+        )}
+        {showsCode && (
+          <div className="account-field">
+            <Label htmlFor="account-code">Code reçu par email</Label>
+            <Input id="account-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.code} onChange={(event) => update("code", event.target.value.replace(/\D/g, ""))} autoComplete="one-time-code" required />
+          </div>
+        )}
+        {showsPassword && (
+          <div className="account-field">
+            <Label htmlFor="account-password">{passwordLabel}</Label>
+            <Input id="account-password" type="password" value={form.password} onChange={(event) => update("password", event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} required />
+          </div>
+        )}
+        {showsPasswordConfirm && (
+          <div className="account-field">
+            <Label htmlFor="account-password-confirm">{passwordConfirmLabel}</Label>
+            <Input id="account-password-confirm" type="password" value={form.passwordConfirm} onChange={(event) => update("passwordConfirm", event.target.value)} autoComplete="new-password" minLength={8} required />
+          </div>
+        )}
+        {info && <p className="account-form-notice" role="status">{info}</p>}
         {error && <p className="account-form-error" role="alert">{error}</p>}
-        <Button className="action-button action-button-full account-submit" type="submit" disabled={submitting}><span>{submitting ? "Connexion en cours" : mode === "signup" ? "Créer mon compte" : "Se connecter"}</span>{mode === "signup" ? <ArrowUpRight size={16} /> : <Check size={16} />}</Button>
-        <p className="account-switch">{mode === "signup" ? "Vous avez déjà un compte ?" : "Première visite ?"} <button type="button" onClick={() => switchMode(mode === "signup" ? "login" : "signup")}>{mode === "signup" ? "Se connecter" : "Créer un compte"}</button></p>
+
+        <ShineCTA className="pbg-btn pbg-btn-primary account-submit" type="submit" disabled={submitting}>
+          <span>{submitting ? "En cours…" : SUBMIT_LABELS[mode]}</span>
+          {mode === "login" || mode === "reset" ? <Check size={16} /> : <ArrowUpRight size={16} />}
+        </ShineCTA>
+
+        {mode === "login" && (
+          <p className="account-switch">
+            <button type="button" onClick={() => switchMode("forgot")} className="account-switch-link">Mot de passe oublié ?</button>
+          </p>
+        )}
+        {(mode === "login" || mode === "signup") && (
+          <p className="account-switch">
+            {mode === "signup" ? "Vous avez déjà un compte ?" : "Première visite ?"}
+            {" "}
+            <Link004 as="button" type="button" onClick={() => switchMode(mode === "signup" ? "login" : "signup")} className="account-switch-link">
+              {mode === "signup" ? "Se connecter" : "Créer un compte"}
+            </Link004>
+          </p>
+        )}
+        {isRecoveryMode && (
+          <p className="account-switch">
+            Vous vous en souvenez ?{" "}
+            <button type="button" onClick={() => switchMode("login")} className="account-switch-link">Revenir à la connexion</button>
+          </p>
+        )}
       </form>
     </div>
   );
@@ -114,12 +257,48 @@ function OrdersSummary({ upcoming, delivered, total }) {
   );
 }
 
+const ORDER_STEPS = [
+  { key: "pending", label: "Reçue" },
+  { key: "confirmed", label: "Confirmée" },
+  { key: "preparing", label: "En prépa" },
+  { key: "ready", label: "Prête" },
+  { key: "delivered", label: "Livrée" },
+];
+const DELIVERED_KEYS = new Set(["delivered", "withdrawn", "completed"]);
+
+function OrderTimeline({ status }) {
+  const isCancelled = status === "cancelled";
+  const currentIndex = isCancelled
+    ? -1
+    : DELIVERED_KEYS.has(status)
+      ? ORDER_STEPS.length - 1
+      : ORDER_STEPS.findIndex((s) => s.key === status);
+  return (
+    <ol className={`order-timeline ${isCancelled ? "is-cancelled" : ""}`} aria-label="Progression de la commande">
+      {ORDER_STEPS.map((step, i) => {
+        const done = !isCancelled && i <= currentIndex;
+        const active = !isCancelled && i === currentIndex;
+        return (
+          <li key={step.key} className={`order-timeline-step ${done ? "is-done" : ""} ${active ? "is-active" : ""}`}>
+            <span className="order-timeline-dot" aria-hidden="true" />
+            <span className="order-timeline-label">{step.label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function OrderRow({ order }) {
   const itemSummary = order.items?.map((item) => `${item.quantity} × ${item.title}`).join(", ");
   return (
     <article className="account-reservation-row">
       <div className="account-reservation-date"><span>{new Date(order.createdAt).toLocaleDateString("fr-FR")}</span></div>
-      <div className="account-reservation-main"><h3>{order.deliveryMode === "delivery" ? `Livraison · ${order.communeName}` : "Retrait chez Galatee"}</h3><p>{itemSummary}</p></div>
+      <div className="account-reservation-main">
+        <h3>{order.deliveryMode === "delivery" ? `Livraison · ${order.communeName}` : "Retrait chez Galatée"}</h3>
+        <p>{itemSummary}</p>
+        <OrderTimeline status={order.status} />
+      </div>
       <span className={`account-status account-status-${order.status}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
     </article>
   );
@@ -150,30 +329,19 @@ export default function AccountPage() {
 
   if (!account) {
     return (
-      <div className="page page-account pbg-page pbg-page-cream">
-        <section className="pbg-page-header">
-          <div className="pbg-page-shell">
-            <p className="pbg-page-kicker"><span>L'espace Galatee</span></p>
-            <h1 className="pbg-page-title">{mode === "signup" ? <>Gardons votre<br /><em>soirée en mémoire.</em></> : <>Retrouver<br /><em>votre table.</em></>}</h1>
-            <p className="pbg-page-lede">Créez un accès personnel pour retrouver vos commandes et préremplir vos prochaines commandes.</p>
-            <div className="mobile-intro-facts" aria-hidden="true"><span><small>Compte</small><strong>Facultatif</strong></span><span><small>Demandes</small><strong>Retrouvées</strong></span><span><small>Coordonnées</small><strong>Conservées</strong></span></div>
-            <div className="mobile-screen-guide" aria-hidden="true"><span>01 / 03</span><i /><span>Votre accès commence ici</span></div>
+      <div className="page page-account page-account-access">
+        <SEO
+          title="Espace client — Connexion ou création de compte"
+          description="Connectez-vous ou créez votre compte Pasta by Galatée pour retrouver vos commandes et démarrer votre programme fidélité."
+          path="/compte"
+          noIndex
+        />
+        <section className="account-access-section">
+          <div className="pbg-page-shell account-access-wrap">
+            <Reveal>
+              <CustomerAccessForm />
+            </Reveal>
           </div>
-        </section>
-        <section className="page-shell account-access-layout">
-          <Reveal className="account-side-panel">
-            <div className="reservation-emblem" aria-hidden="true">G</div>
-            <p className="account-side-tag">L'espace Galatee</p>
-            <ul className="account-side-list">
-              <li><span><UserRound size={13} strokeWidth={1.7} /></span><b>Coordonnées</b><em> conservées</em></li>
-              <li><span><Clock3 size={13} strokeWidth={1.7} /></span><b>Commandes</b><em> en cours</em></li>
-              <li><span><Mail size={13} strokeWidth={1.7} /></span><b>Historique</b><em> conservé</em></li>
-            </ul>
-            <Link className="text-link account-side-alt" to="/commande">Commander sans compte <ArrowUpRight size={13} /></Link>
-          </Reveal>
-          <Reveal delay={100}>
-            <CustomerAccessForm />
-          </Reveal>
         </section>
       </div>
     );
@@ -181,9 +349,15 @@ export default function AccountPage() {
 
   return (
     <div className="page page-account pbg-page pbg-page-cream page-account-member">
+      <SEO
+        title="Mon espace client"
+        description="Retrouvez vos commandes, votre programme fidélité et vos coordonnées Pasta by Galatée."
+        path="/compte"
+        noIndex
+      />
       <section className="pbg-page-header">
         <div className="pbg-page-shell">
-          <p className="pbg-page-kicker"><span>Votre espace Galatee</span></p>
+          <p className="pbg-page-kicker"><span>Votre espace Galatée</span></p>
           <h1 className="pbg-page-title">Bonjour,<br /><em>{account.firstName}.</em></h1>
           <p className="pbg-page-lede">Retrouvez vos coordonnées et le fil de vos commandes.</p>
         </div>
@@ -212,7 +386,10 @@ export default function AccountPage() {
             </li>
           </ul>
           <p className="account-profile-note">Vos coordonnées sont proposées automatiquement lors de votre prochaine commande.</p>
-          {loyalty?.settings?.active && <div className="account-loyalty-card"><div className="account-loyalty-heading"><span>Programme fidélité</span><strong>{loyalty.qualifyingOrders} commande{loyalty.qualifyingOrders > 1 ? "s" : ""}</strong></div><p>{loyalty.rewardAvailable ? loyalty.rewardAvailable.title : `${loyalty.ordersToNextReward} commande${loyalty.ordersToNextReward > 1 ? "s" : ""} avant votre récompense`}</p><div className="account-loyalty-track" aria-hidden="true"><span style={{ width: `${loyalty.rewardAvailable ? 100 : Math.min(100, (loyalty.progressInCycle / loyalty.settings.threshold) * 100)}%` }} /></div></div>}
+          {loyalty?.settings?.active && (loyalty.rewardAvailable
+            ? <GlowCard className="account-loyalty-card"><div className="account-loyalty-heading"><span>Programme fidélité</span><strong>{loyalty.qualifyingOrders} commande{loyalty.qualifyingOrders > 1 ? "s" : ""}</strong></div><p>{loyalty.rewardAvailable.title}</p><div className="account-loyalty-track" aria-hidden="true"><span style={{ width: "100%" }} /></div></GlowCard>
+            : <div className="account-loyalty-card"><div className="account-loyalty-heading"><span>Programme fidélité</span><strong>{loyalty.qualifyingOrders} commande{loyalty.qualifyingOrders > 1 ? "s" : ""}</strong></div><p>{loyalty.ordersToNextReward} commande{loyalty.ordersToNextReward > 1 ? "s" : ""} avant votre récompense</p><div className="account-loyalty-track" aria-hidden="true"><span style={{ width: `${Math.min(100, (loyalty.progressInCycle / loyalty.settings.threshold) * 100)}%` }} /></div></div>
+          )}
           <button type="button" className="account-logout" onClick={logout}><LogOut size={13} strokeWidth={1.7} /> Se déconnecter</button>
         </Reveal>
         <Reveal className="account-reservations" delay={100}>
@@ -243,6 +420,27 @@ export default function AccountPage() {
           {upcoming.length > 0 && <div className="account-reservation-group"><p className="account-group-label">En cours</p>{upcoming.map((order) => <OrderRow key={order.id} order={order} />)}</div>}
           {past.length > 0 && <div className="account-reservation-group"><p className="account-group-label">Historique</p>{past.map((order) => <OrderRow key={order.id} order={order} />)}</div>}
         </Reveal>
+      </section>
+
+      <section className="pbg-section pbg-section-bordeaux pbg-account-club">
+        <div className="pbg-page-shell">
+          <div className="pbg-section-index pbg-section-index-light">
+            <span>+</span><i />Pasta Lover Club
+          </div>
+          <h2 className="pbg-section-title pbg-section-title-light">
+            Chaque plat,
+            <br /><em>une récompense.</em>
+          </h2>
+          <p className="pbg-section-lede pbg-section-lede-light">
+            Tous les 10 plats commandés, un dessert offert. Toutes les 5 commandes livrées, la prochaine livraison est offerte. Bientôt : cadeaux d'anniversaire et surprises maison.
+          </p>
+          <div className="pbg-account-club-actions">
+            <Link to="/pasta-lover-club" className="pbg-btn pbg-btn-light">
+              <span>Découvrir le club</span>
+              <ArrowUpRight size={16} strokeWidth={1.6} />
+            </Link>
+          </div>
+        </div>
       </section>
     </div>
   );

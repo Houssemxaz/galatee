@@ -93,7 +93,7 @@ export default function DeliveryPage() {
         <div>
           <p className="bo-eyebrow">Logistique</p>
           <h2>Configuration de livraison</h2>
-          <p className="bo-page-intro">Définissez les communes desservies par Galatee et le tarif ajouté à chaque commande.</p>
+          <p className="bo-page-intro">Définissez les communes desservies par Galatée et le tarif ajouté à chaque commande.</p>
         </div>
         <Truck size={25} strokeWidth={1.5} aria-hidden="true" />
       </div>

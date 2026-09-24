@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Link, useLocation } from "react-router-dom";
 import { ArrowUpRight, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
+import { useTableMode } from "@/context/TableModeContext";
 import BrandLogo from "@/components/BrandLogo";
 
 const NAV_ITEMS = [
@@ -12,12 +13,19 @@ const NAV_ITEMS = [
   { to: "/contact", label: "Contact" },
 ];
 
+const TABLE_MODE_KEYS = new Set(["/menu", "/commande", "/pasta-lover-club"]);
+
 export default function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const location = useLocation();
   const { account, loading, logout } = useCustomerAuth();
+  const { active: tableMode } = useTableMode();
+  const navItems = useMemo(() => (
+    tableMode ? NAV_ITEMS.filter((item) => TABLE_MODE_KEYS.has(item.to)) : NAV_ITEMS
+  ), [tableMode]);
+  const homeHref = tableMode ? "/menu" : "/";
 
   useEffect(() => {
     let ticking = false;
@@ -58,11 +66,11 @@ export default function SiteHeader() {
     <>
       <header className={`site-nav ${scrolled ? "is-scrolled" : ""} ${hidden ? "is-hidden" : ""}`} data-route={location.pathname}>
         <div className="site-nav-inner">
-          <Link to="/" className="site-nav-mark" aria-label="Pasta by Galatée, accueil">
+          <Link to={homeHref} className="site-nav-mark" aria-label="Pasta by Galatée, accueil">
             <BrandLogo className="site-nav-logo" />
           </Link>
           <nav className="site-nav-links" aria-label="Navigation principale">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => `site-nav-link ${isActive ? "is-active" : ""}`}>
                 {item.label}
               </NavLink>
@@ -86,7 +94,7 @@ export default function SiteHeader() {
       </header>
       <div className={`site-drawer ${open ? "is-open" : ""}`} aria-hidden={!open}>
         <nav aria-label="Navigation mobile">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} onClick={() => setOpen(false)} className={({ isActive }) => `site-drawer-link ${isActive ? "is-active" : ""}`}>
               <span>{item.label}</span>
               <span aria-hidden="true">→</span>

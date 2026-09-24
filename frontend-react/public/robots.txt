@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /backoffice
+Disallow: /_unused
+
+Sitemap: https://galatee.dz/sitemap.xml

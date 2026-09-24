@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import Reveal from "@/components/Reveal";
+import DishImage from "@/components/DishImage";
+import SEO from "@/components/SEO";
 import { fetchMenu, categories, trackEvent } from "@/lib/api";
 
 export default function MenuPage() {
@@ -24,8 +26,35 @@ export default function MenuPage() {
     [category, dishes],
   );
 
+  const menuJsonLd = dishes.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "Menu",
+    "name": "La carte Pasta by Galatée",
+    "hasMenuSection": {
+      "@type": "MenuSection",
+      "name": "Nos plats",
+      "hasMenuItem": dishes.map((dish) => ({
+        "@type": "MenuItem",
+        "name": dish.title,
+        "description": dish.summary,
+        "image": dish.image ? `https://galatee.dz${dish.image}` : undefined,
+        "offers": dish.priceCents ? {
+          "@type": "Offer",
+          "price": (dish.priceCents / 100).toFixed(2),
+          "priceCurrency": "DZD",
+        } : undefined,
+      })),
+    },
+  } : undefined;
+
   return (
     <div className="page page-menu pbg-page pbg-page-cream">
+      <SEO
+        title="La carte — Pâtes fraîches quotidiennes"
+        description="Découvrez la carte Pasta by Galatée : spaghetti pomodoro, carbonara, tiramisu maison et pâtes fraîches préparées le matin. Livraison et retrait à Alger."
+        path="/menu"
+        jsonLd={menuJsonLd}
+      />
       <section className="pbg-page-header">
         <div className="pbg-page-shell">
           <p className="pbg-page-kicker"><span>La carte</span></p>
@@ -60,24 +89,27 @@ export default function MenuPage() {
           </p>
         </div>
 
-        <div className="pbg-dish-grid" aria-live="polite">
+        <div className="pbg-dish-grid" aria-live="polite" key={category} data-menu-grid>
           {filtered.map((dish, index) => (
-            <Reveal key={dish.slug} delay={index * 80}>
-              <Link to={`/menu/${dish.slug}`} className="pbg-dish-card">
-                <div className="pbg-dish-card-media">
-                  <img src={dish.image} alt={dish.alt} loading="lazy" decoding="async" />
-                </div>
-                <div className="pbg-dish-card-body">
-                  <span className="pbg-dish-card-label">{dish.label}</span>
-                  <h2 className="pbg-dish-card-title">{dish.title}</h2>
-                  <p className="pbg-dish-card-summary">{dish.summary}</p>
-                  <span className="pbg-dish-card-cta">
-                    <span>Voir le plat</span>
-                    <ArrowUpRight size={14} strokeWidth={1.8} />
-                  </span>
-                </div>
-              </Link>
-            </Reveal>
+            <Link
+              key={dish.slug}
+              to={`/menu/${dish.slug}`}
+              className="pbg-dish-card pbg-dish-card-anim"
+              style={{ "--stagger": `${index * 60}ms` }}
+            >
+              <div className="pbg-dish-card-media">
+                <DishImage dish={dish} sizes="(max-width: 720px) 100vw, (max-width: 1200px) 50vw, 33vw" />
+              </div>
+              <div className="pbg-dish-card-body">
+                <span className="pbg-dish-card-label">{dish.label}</span>
+                <h2 className="pbg-dish-card-title">{dish.title}</h2>
+                <p className="pbg-dish-card-summary">{dish.summary}</p>
+                <span className="pbg-dish-card-cta">
+                  <span>Voir le plat</span>
+                  <ArrowUpRight size={14} strokeWidth={1.8} />
+                </span>
+              </div>
+            </Link>
           ))}
         </div>
       </section>

@@ -1,16 +1,10 @@
-import { Badge } from "@/components/ui/badge";
-
-const LABELS = {
-  draft: "Brouillon",
-  published: "Publié",
-  archived: "Archivé",
+const STATUS_MAP = {
+  draft: { label: "Brouillon", tone: "warn" },
+  published: { label: "Publié", tone: "ok" },
+  archived: { label: "Archivé", tone: "muted" },
 };
 
 export default function StatusBadge({ status }) {
-  return (
-    <Badge variant="outline" className={`bo-status-${status}`}>
-      <span className="bo-status-dot" aria-hidden="true" />
-      {LABELS[status] || status}
-    </Badge>
-  );
+  const meta = STATUS_MAP[status] || { label: status, tone: "muted" };
+  return <span className={`bo-status bo-status-${meta.tone}`}>{meta.label}</span>;
 }

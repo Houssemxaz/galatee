@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import Reveal from "@/components/Reveal";
+import SEO from "@/components/SEO";
 
 const CHANNELS = [
   {
@@ -29,6 +30,11 @@ const CHANNELS = [
 export default function ContactPage() {
   return (
     <div className="page page-contact pbg-page pbg-page-cream">
+      <SEO
+        title="Contact — Téléphone, email, Instagram"
+        description="Contactez Pasta by Galatée à Hydra, Alger. Réponse du mercredi au samedi — téléphone, email bonjour@galatee.dz, ou Instagram @pasta.bygalatee."
+        path="/contact"
+      />
       <section className="pbg-page-header pbg-page-header-contact">
         <div className="pbg-page-shell">
           <p className="pbg-page-mark"><span>05</span><i /><em>Contact</em></p>

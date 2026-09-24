@@ -6,6 +6,8 @@ import {
   logoutCustomer,
   requestCustomerCode,
   verifyCustomerCode,
+  requestCustomerPasswordReset,
+  confirmCustomerPasswordReset,
 } from "@/lib/api";
 
 const CustomerAuthContext = createContext(null);
@@ -46,6 +48,12 @@ export function CustomerAuthProvider({ children }) {
     },
     verifyCode: async (body) => {
       const payload = await verifyCustomerCode(body);
+      setAccount(payload.account || null);
+      return payload;
+    },
+    requestPasswordReset: requestCustomerPasswordReset,
+    confirmPasswordReset: async (body) => {
+      const payload = await confirmCustomerPasswordReset(body);
       setAccount(payload.account || null);
       return payload;
     },

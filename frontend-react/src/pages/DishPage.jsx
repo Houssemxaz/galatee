@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import Reveal from "@/components/Reveal";
+import PopCTA from "@/components/PopCTA";
+import DishImage from "@/components/DishImage";
+import SEO from "@/components/SEO";
 import { fetchMenu } from "@/lib/api";
 
 export default function DishPage() {
@@ -37,8 +40,32 @@ export default function DishPage() {
   );
   if (state === "error") return <div className="page page-dish pbg-page pbg-page-cream"><div className="pbg-page-shell pbg-dish-status">Impossible de charger le plat.</div></div>;
 
+  const dishJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "MenuItem",
+    "name": dish.title,
+    "description": dish.description || dish.summary,
+    "image": dish.image ? `https://galatee.dz${dish.image}` : undefined,
+    "url": `https://galatee.dz/menu/${dish.slug}`,
+    "offers": dish.priceCents ? {
+      "@type": "Offer",
+      "price": (dish.priceCents / 100).toFixed(2),
+      "priceCurrency": "DZD",
+      "availability": "https://schema.org/InStock",
+    } : undefined,
+  };
+
   return (
     <div className="page page-dish pbg-page pbg-page-cream">
+      <SEO
+        title={`${dish.title} — ${dish.summary || "Pâtes fraîches"}`}
+        description={dish.description || dish.summary || `${dish.title} — pâtes fraîches faites maison chez Pasta by Galatée, Hydra, Alger.`}
+        path={`/menu/${dish.slug}`}
+        image={dish.image ? `https://galatee.dz${dish.image}` : undefined}
+        imageAlt={dish.alt}
+        type="product"
+        jsonLd={dishJsonLd}
+      />
       <div className="pbg-page-shell pbg-dish-back">
         <Link to="/menu" className="pbg-dish-back-link">
           <ArrowLeft size={14} strokeWidth={1.8} />
@@ -49,7 +76,7 @@ export default function DishPage() {
       <section className="pbg-dish-hero">
         <Reveal className="pbg-dish-hero-media">
           <figure className="pbg-dish-figure">
-            <img src={dish.image} alt={dish.alt} loading="eager" />
+            <DishImage dish={dish} sizes="(max-width: 900px) 100vw, 55vw" eager />
           </figure>
         </Reveal>
         <Reveal delay={120} className="pbg-dish-hero-copy">
@@ -59,10 +86,10 @@ export default function DishPage() {
           <div className="pbg-dish-page-rule" aria-hidden="true" />
           <p className="pbg-dish-page-desc">{dish.description}</p>
           <div className="pbg-dish-page-actions">
-            <Link to={`/commande?dish=${encodeURIComponent(dish.id)}`} className="pbg-btn pbg-btn-primary">
+            <PopCTA as={Link} to={`/commande?dish=${encodeURIComponent(dish.id)}`}>
               <span>Commander ce plat</span>
-              <ArrowUpRight size={16} strokeWidth={1.6} />
-            </Link>
+              <ArrowUpRight size={14} strokeWidth={2} />
+            </PopCTA>
             <Link to="/menu" className="pbg-dish-back-link">
               <ArrowLeft size={14} strokeWidth={1.8} />
               <span>Voir les autres plats</span>

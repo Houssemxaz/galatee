@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CircleDot } from "lucide-react";
+import { CircleDot, Search } from "lucide-react";
 
 const DAYS = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 const MONTHS = [
@@ -27,12 +27,24 @@ export default function Topbar({ sectionLabel }) {
 
   const live = isServiceEvening();
 
+  function openPalette() {
+    const evt = new KeyboardEvent("keydown", { key: "k", metaKey: true, ctrlKey: true, bubbles: true });
+    window.dispatchEvent(evt);
+  }
+
   return (
     <header className="bo-topbar">
       <div className="bo-topbar-left">
         <span className="bo-topbar-crumb">Back-office</span>
         <h1 className="bo-topbar-title">{sectionLabel}</h1>
       </div>
+
+      <button type="button" className="bo-topbar-search" onClick={openPalette} aria-label="Ouvrir la palette de commandes">
+        <Search size={14} strokeWidth={2} />
+        <span className="bo-topbar-search-label">Rechercher…</span>
+        <span className="bo-kbd bo-kbd-light">⌘K</span>
+      </button>
+
       <div className="bo-topbar-right">
         <span className="bo-topbar-date">{now}</span>
         <span className={`bo-topbar-status ${live ? "is-live" : ""}`}>
@@ -40,8 +52,8 @@ export default function Topbar({ sectionLabel }) {
           {live ? "En service" : "Hors service"}
         </span>
         <button type="button" className="bo-topbar-user" aria-label="Compte administrateur">
-          <span className="bo-topbar-user-label">Admin</span>
           <span className="bo-topbar-user-avatar" aria-hidden="true">G</span>
+          <span className="bo-topbar-user-label">Admin</span>
         </button>
       </div>
     </header>

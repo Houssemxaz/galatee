@@ -4,10 +4,94 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2F3821" />
-    <meta name="description" content="Galatee, maison de pâtes fraîches et service du soir à Hydra, Alger." />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Primary Meta Tags -->
+    <title>Pasta by Galatée — Pâtes fraîches à Hydra, Alger · Livraison</title>
+    <meta name="description" content="Pasta by Galatée — Trattoria italienne à Hydra, Alger. Pâtes fraîches faites maison, livraison ou retrait du mercredi au samedi soir. Commande en ligne." />
+    <meta name="keywords" content="pâtes fraîches Alger, restaurant italien Hydra, trattoria Alger, livraison pâtes Alger, pasta by galatée, spaghetti carbonara Alger, tiramisu Alger" />
+    <meta name="author" content="Pasta by Galatée" />
+    <link rel="canonical" href="https://galatee.dz/" />
+
+    <!-- Open Graph / Facebook / WhatsApp / LinkedIn -->
+    <meta property="og:type" content="restaurant.restaurant" />
+    <meta property="og:site_name" content="Pasta by Galatée" />
+    <meta property="og:url" content="https://galatee.dz/" />
+    <meta property="og:title" content="Pasta by Galatée — Trattoria italienne à Hydra, Alger" />
+    <meta property="og:description" content="Pâtes fraîches faites maison, livraison ou retrait du mercredi au samedi soir. Trattoria méditerranéenne à Hydra, Alger." />
+    <meta property="og:image" content="https://galatee.dz/assets/brand/box-pomodoro-steam-960.webp" />
+    <meta property="og:image:alt" content="Spaghetti pomodoro dans une box PASTA by Galatée" />
+    <meta property="og:locale" content="fr_DZ" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Pasta by Galatée — Trattoria à Hydra, Alger" />
+    <meta name="twitter:description" content="Pâtes fraîches maison · Livraison ou retrait à Alger · Du mercredi au samedi soir." />
+    <meta name="twitter:image" content="https://galatee.dz/assets/brand/box-pomodoro-steam-960.webp" />
+
+    <!-- Favicons + PWA -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preload" as="image" href="/assets/brand/box-pomodoro-steam.png" fetchpriority="high" />
-    <title>Galatee — Maison de pâtes fraîches</title>
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Preload critical LCP image (WebP) -->
+    <link rel="preload" as="image" href="/assets/brand/box-pomodoro-steam-960.webp" type="image/webp" fetchpriority="high" />
+
+    <!-- Structured Data — Restaurant + LocalBusiness -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "@id": "https://galatee.dz/#restaurant",
+      "name": "Pasta by Galatée",
+      "alternateName": "Galatée",
+      "description": "Trattoria italienne à Hydra, Alger. Pâtes fraîches faites maison, livraison ou retrait du mercredi au samedi soir.",
+      "url": "https://galatee.dz/",
+      "image": [
+        "https://galatee.dz/assets/brand/box-pomodoro-steam-960.webp",
+        "https://galatee.dz/assets/pasta-by-galatee/menu-spaghetti-pomodoro-v1-960.webp",
+        "https://galatee.dz/assets/pasta-by-galatee/menu-spaghetti-carbonara-v1-960.webp"
+      ],
+      "logo": "https://galatee.dz/favicon.svg",
+      "telephone": "+213",
+      "email": "bonjour@galatee.dz",
+      "priceRange": "1500-4000 DA",
+      "servesCuisine": ["Italian", "Pasta", "Mediterranean"],
+      "acceptsReservations": true,
+      "hasMenu": "https://galatee.dz/menu",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Hydra",
+        "addressLocality": "Alger",
+        "addressRegion": "Alger",
+        "postalCode": "16035",
+        "addressCountry": "DZ"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 36.7451,
+        "longitude": 3.0397
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Wednesday", "Thursday", "Friday", "Saturday"],
+          "opens": "19:00",
+          "closes": "23:30"
+        }
+      ],
+      "areaServed": {
+        "@type": "City",
+        "name": "Alger"
+      },
+      "sameAs": [
+        "https://www.instagram.com/pasta.bygalatee/",
+        "https://www.tiktok.com/@pasta.bygalatee",
+        "https://www.snapchat.com/add/pasta.bygalatee"
+      ]
+    }
+    </script>
+
     <style>
       html, body { margin: 0; padding: 0; }
       #pbg-splash {
@@ -21,8 +105,8 @@
           linear-gradient(160deg, #2F3821 0%, #3D452A 55%, #263019 100%);
         color: #F5EFE4;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        transition: opacity 480ms cubic-bezier(0.23, 1, 0.32, 1),
-                    visibility 0s linear 480ms;
+        transition: opacity 320ms cubic-bezier(0.23, 1, 0.32, 1),
+                    visibility 0s linear 320ms;
       }
       #pbg-splash.pbg-splash-out {
         opacity: 0;
@@ -32,7 +116,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 28px;
+        gap: 20px;
       }
       .pbg-splash-logo {
         width: 132px;
@@ -47,9 +131,6 @@
         letter-spacing: 0.06em;
         color: #F5EFE4;
         position: relative;
-        opacity: 0;
-        animation: pbgSplashLogoIn 620ms 80ms cubic-bezier(0.23, 1, 0.32, 1) forwards,
-                   pbgSplashPulse 2.4s 700ms ease-in-out infinite;
       }
       .pbg-splash-logo::after {
         content: "by Galatée";
@@ -63,49 +144,12 @@
         letter-spacing: 0.08em;
         color: rgba(245, 239, 228, 0.72);
       }
-      .pbg-splash-dots {
-        display: flex;
-        gap: 8px;
-        margin-top: 22px;
-        opacity: 0;
-        animation: pbgSplashLogoIn 500ms 380ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
-      }
-      .pbg-splash-dots span {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #D0362B;
-        animation: pbgSplashDot 1.2s ease-in-out infinite;
-      }
-      .pbg-splash-dots span:nth-child(2) { animation-delay: 180ms; background: #E8A652; }
-      .pbg-splash-dots span:nth-child(3) { animation-delay: 360ms; background: #3A6E42; }
-      @keyframes pbgSplashLogoIn {
-        from { opacity: 0; transform: translateY(10px) scale(0.94); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-      }
-      @keyframes pbgSplashPulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(232, 166, 82, 0); }
-        50% { box-shadow: 0 0 0 12px rgba(232, 166, 82, 0.10); }
-      }
-      @keyframes pbgSplashDot {
-        0%, 60%, 100% { transform: translateY(0); opacity: 0.55; }
-        30% { transform: translateY(-8px); opacity: 1; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .pbg-splash-logo, .pbg-splash-dots, .pbg-splash-dots span {
-          animation: none !important;
-          opacity: 1 !important;
-        }
-      }
     </style>
   </head>
   <body>
     <div id="pbg-splash" aria-hidden="true">
       <div class="pbg-splash-inner">
         <div class="pbg-splash-logo">PASTA</div>
-        <div class="pbg-splash-dots" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
       </div>
     </div>
     <div id="root"></div>
@@ -113,22 +157,16 @@
       (function () {
         var splash = document.getElementById("pbg-splash");
         if (!splash) return;
-        var minShownAt = Date.now();
-        var MIN_MS = 600;
         function hide() {
-          var elapsed = Date.now() - minShownAt;
-          var wait = Math.max(0, MIN_MS - elapsed);
-          setTimeout(function () {
-            splash.classList.add("pbg-splash-out");
-            setTimeout(function () { splash.remove(); }, 520);
-          }, wait);
+          splash.classList.add("pbg-splash-out");
+          setTimeout(function () { splash.remove(); }, 340);
         }
         if (document.readyState === "complete") {
           hide();
         } else {
           window.addEventListener("load", hide, { once: true });
         }
-        setTimeout(hide, 5000);
+        setTimeout(hide, 2500);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

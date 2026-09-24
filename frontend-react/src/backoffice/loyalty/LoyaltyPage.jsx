@@ -67,7 +67,7 @@ export default function LoyaltyPage() {
 
   return (
     <section className="bo-loyalty-page">
-      <div className="bo-panel-heading bo-loyalty-heading"><div><p className="bo-eyebrow">Relation client</p><h2>Fidélité et promotions</h2><p className="bo-page-intro">Récompensez les clients qui reviennent chez Galatee.</p></div><Gift size={24} strokeWidth={1.5} aria-hidden="true" /></div>
+      <div className="bo-panel-heading bo-loyalty-heading"><div><p className="bo-eyebrow">Relation client</p><h2>Fidélité et promotions</h2><p className="bo-page-intro">Récompensez les clients qui reviennent chez Galatée.</p></div><Gift size={24} strokeWidth={1.5} aria-hidden="true" /></div>
       {alert && <p className={`bo-inline-alert bo-inline-alert-${alert.kind}`} role="status">{alert.message}</p>}
       {state === "loading" && <p className="bo-empty">Chargement de la fidélité…</p>}
       {state === "error" && <p className="bo-empty">La fidélité n’a pas pu être chargée.</p>}

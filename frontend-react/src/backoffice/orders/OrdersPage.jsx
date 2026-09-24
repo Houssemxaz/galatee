@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, MapPin, Phone, RefreshCw, ShoppingBag, X } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
+import { Slideover, EmptyState, SkeletonRows } from "../shared/primitives.jsx";
 
 const STATUS_META = {
   pending: ["À appeler", "warn"],
@@ -45,7 +46,7 @@ export default function OrdersPage() {
     const message = `${count} nouvelle${count > 1 ? "s" : ""} commande${count > 1 ? "s" : ""} à traiter.`;
     setNotificationMessage(message);
     if (notificationPermission === "granted" && typeof Notification !== "undefined") {
-      try { new Notification("Galatee · nouvelle commande", { body: message }); } catch { /* Notification can be blocked after permission changes. */ }
+      try { new Notification("Galatée · nouvelle commande", { body: message }); } catch { /* Notification can be blocked after permission changes. */ }
     }
     window.setTimeout(() => setNotificationMessage(""), 7000);
   }
@@ -96,6 +97,156 @@ export default function OrdersPage() {
     <section className="bo-kpis" aria-label="Indicateurs commandes"><div className="bo-kpi bo-kpi-warn"><p className="bo-kpi-label">À traiter</p><p className="bo-kpi-value">{pendingCount}</p><p className="bo-kpi-hint">Appels de confirmation</p></div><div className="bo-kpi"><p className="bo-kpi-label">Commandes affichées</p><p className="bo-kpi-value">{filtered.length}</p><p className="bo-kpi-hint">Actualisation automatique</p></div></section>
     <section className="bo-filters" aria-label="Filtres commandes"><div className="bo-filter-group"><label className="bo-filter-label">Statut</label><select className="bo-native-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Toutes</option>{Object.entries(STATUS_META).map(([value, [label]]) => <option key={value} value={value}>{label}</option>)}</select></div><div className="bo-filter-group bo-filter-search"><label className="bo-filter-label">Recherche</label><Input placeholder="N° commande, client, téléphone…" value={search} onChange={(event) => setSearch(event.target.value)} /></div><Button variant="outline" size="sm" onClick={load} aria-label="Rafraîchir les commandes"><RefreshCw size={14} /></Button>{notificationPermission !== "granted" && notificationPermission !== "unsupported" && <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer les notifications de nouvelles commandes"><Bell size={14} /> <span>Activer les alertes</span></Button>}</section>
     {alert && <p className={`bo-inline-alert bo-inline-alert-${alert.kind}`} role="status">{alert.message}</p>}
-    <section className="bo-table-wrap"><div className="bo-section-heading"><div><p className="bo-eyebrow">Suivi opérationnel</p><h2>Commandes</h2></div><span className="bo-live-note"><span className="bo-live-dot" /> Mise à jour toutes les 15 s</span></div>{state === "loading" && <p className="bo-empty">Chargement des commandes…</p>}{state === "error" && <p className="bo-empty">Impossible de charger les commandes.</p>}{state === "ready" && !filtered.length && <p className="bo-empty">Aucune commande ne correspond aux filtres.</p>}{state === "ready" && filtered.length > 0 && <div className="bo-order-list">{filtered.map((order) => { const action = nextAction(order); return <article className={`bo-order-row ${expanded?.id === order.id ? "is-expanded" : ""}`} key={order.id}><button type="button" className="bo-order-main" onClick={() => setExpanded(expanded?.id === order.id ? null : order)}><span className="bo-order-number">{order.orderNumber}</span><span className="bo-order-client"><strong>{order.firstName} {order.lastName}</strong><small><Phone size={11} /> {order.phone}</small></span><span className="bo-order-mode"><ShoppingBag size={13} /> {order.deliveryMode === "delivery" ? `Livraison · ${order.communeName}` : "Retrait sur place"}</span><span className="bo-order-total">{formatDzd(order.totalCents)}</span><Status value={order.status} /><ChevronDown className="bo-order-chevron" size={16} /></button>{expanded?.id === order.id && <div className="bo-order-detail"><div className="bo-order-items">{order.items.map((item) => <div key={`${order.id}-${item.productId}`}><span>{item.quantity} × {item.title}</span><strong>{formatDzd(item.lineTotalCents)}</strong></div>)}</div><div className="bo-order-info"><span><MapPin size={13} /> {order.deliveryMode === "delivery" ? `${order.deliveryAddress}, ${order.communeName}` : "Retrait chez Galatee"}</span><span>Paiement à la {order.deliveryMode === "delivery" ? "livraison" : "récupération"}</span><small>Reçue le {formatDate(order.createdAt)}</small></div><div className="bo-order-actions">{order.status === "pending" && <Button className="bo-action-confirm" onClick={() => updateStatus(order, "confirmed")} disabled={actionId === `${order.id}:confirmed`}><Check size={14} /> Confirmer après appel</Button>}{action && order.status !== "pending" && <Button onClick={() => updateStatus(order, action[0])} disabled={actionId === `${order.id}:${action[0]}`}><Check size={14} /> {action[1]}</Button>}{["pending", "confirmed", "preparing"].includes(order.status) && <Button variant="outline" onClick={() => updateStatus(order, "cancelled")} disabled={actionId === `${order.id}:cancelled`}><X size={14} /> Annuler</Button>}</div></div>}</article>; })}</div>}</section>
+    <section className="bo-table-wrap">
+      <div className="bo-table-heading">
+        <div>
+          <p className="bo-eyebrow">Suivi opérationnel</p>
+          <h2 className="bo-table-title">Commandes</h2>
+        </div>
+        <span className="bo-live-note"><span className="bo-live-dot" /> Mise à jour toutes les 15 s</span>
+      </div>
+
+      {state === "loading" && (
+        <table className="bo-table">
+          <thead>
+            <tr>
+              <th>N°</th><th>Client</th><th>Mode</th><th>Total</th><th>Statut</th><th />
+            </tr>
+          </thead>
+          <tbody>
+            <SkeletonRows rows={6} cols={6} />
+          </tbody>
+        </table>
+      )}
+
+      {state === "error" && (
+        <EmptyState
+          icon={Inbox}
+          title="Impossible de charger les commandes"
+          description="Vérifiez la connexion au serveur puis réessayez."
+          actions={<Button variant="outline" size="sm" onClick={load}><RefreshCw size={13} /> Réessayer</Button>}
+        />
+      )}
+
+      {state === "ready" && !filtered.length && (
+        <EmptyState
+          icon={Inbox}
+          title="Aucune commande"
+          description={search || statusFilter !== "all" ? "Aucune commande ne correspond aux filtres actuels." : "Les nouvelles commandes s'afficheront ici en temps réel."}
+        />
+      )}
+
+      {state === "ready" && filtered.length > 0 && (
+        <table className="bo-table">
+          <thead>
+            <tr>
+              <th>N°</th>
+              <th>Client</th>
+              <th>Mode</th>
+              <th style={{ textAlign: "right" }}>Total</th>
+              <th>Statut</th>
+              <th style={{ width: 32 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((order) => (
+              <tr
+                className="bo-tr"
+                key={order.id}
+                onClick={() => setExpanded(order)}
+              >
+                <td className="bo-td-num">{order.orderNumber}</td>
+                <td>
+                  <span className="bo-td-name-line" style={{ fontWeight: 600 }}>{order.firstName} {order.lastName}</span>
+                  <span className="bo-td-contact-sub"><Phone size={10} strokeWidth={2} /> {order.phone}</span>
+                </td>
+                <td>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <ShoppingBag size={12} strokeWidth={1.8} />
+                    {order.deliveryMode === "delivery" ? `Livraison · ${order.communeName}` : "Retrait"}
+                  </span>
+                </td>
+                <td className="bo-td-num" style={{ textAlign: "right", fontWeight: 600 }}>{formatDzd(order.totalCents)}</td>
+                <td><Status value={order.status} /></td>
+                <td style={{ textAlign: "right", color: "var(--bo-ink-muted)" }}>
+                  <ChevronRight size={14} strokeWidth={2} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+
+    {/* ═══ Slide-over détail commande ═══ */}
+    <Slideover
+      open={Boolean(expanded)}
+      onClose={() => setExpanded(null)}
+      eyebrow={expanded ? `Commande ${expanded.orderNumber}` : ""}
+      title={expanded ? `${expanded.firstName} ${expanded.lastName}` : ""}
+      footer={expanded ? (() => {
+        const action = nextAction(expanded);
+        return (
+          <>
+            {["pending", "confirmed", "preparing"].includes(expanded.status) && (
+              <Button variant="outline" onClick={() => updateStatus(expanded, "cancelled")} disabled={actionId === `${expanded.id}:cancelled`}>
+                <X size={14} /> Annuler
+              </Button>
+            )}
+            {expanded.status === "pending" && (
+              <Button className="bo-action-confirm" onClick={() => updateStatus(expanded, "confirmed")} disabled={actionId === `${expanded.id}:confirmed`}>
+                <Check size={14} /> Confirmer après appel
+              </Button>
+            )}
+            {action && expanded.status !== "pending" && (
+              <Button onClick={() => updateStatus(expanded, action[0])} disabled={actionId === `${expanded.id}:${action[0]}`}>
+                <Check size={14} /> {action[1]}
+              </Button>
+            )}
+          </>
+        );
+      })() : null}
+    >
+      {expanded && (
+        <div className="bo-order-sheet">
+          <div className="bo-order-sheet-status">
+            <Status value={expanded.status} />
+            <span className="bo-order-sheet-total">{formatDzd(expanded.totalCents)}</span>
+          </div>
+
+          <div className="bo-order-sheet-block">
+            <p className="bo-order-sheet-label">Contact</p>
+            <p><Phone size={11} strokeWidth={2} /> {expanded.phone}</p>
+          </div>
+
+          <div className="bo-order-sheet-block">
+            <p className="bo-order-sheet-label">Réception</p>
+            <p>
+              <MapPin size={11} strokeWidth={2} />{" "}
+              {expanded.deliveryMode === "delivery"
+                ? `${expanded.deliveryAddress}, ${expanded.communeName}`
+                : "Retrait chez Galatée"}
+            </p>
+            <p style={{ color: "var(--bo-ink-muted)", fontSize: 12 }}>
+              Paiement à la {expanded.deliveryMode === "delivery" ? "livraison" : "récupération"}
+            </p>
+          </div>
+
+          <div className="bo-order-sheet-block">
+            <p className="bo-order-sheet-label">Articles</p>
+            <ul className="bo-order-sheet-items">
+              {expanded.items.map((item) => (
+                <li key={`${expanded.id}-${item.productId}`}>
+                  <span>{item.quantity} × {item.title}</span>
+                  <strong>{formatDzd(item.lineTotalCents)}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="bo-order-sheet-note">Reçue le {formatDate(expanded.createdAt)}</p>
+        </div>
+      )}
+    </Slideover>
   </div>;
 }

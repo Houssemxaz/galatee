@@ -2,21 +2,29 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import Reveal from "@/components/Reveal";
+import BrandMarquee from "@/components/BrandMarquee";
+import TiltCard from "@/components/TiltCard";
+import ShineCTA from "@/components/ShineCTA";
+import DishImage from "@/components/DishImage";
+import SEO from "@/components/SEO";
 import { fetchMenu, trackEvent } from "@/lib/api";
 
 function MenuTeaserCard({ dish, index }) {
   return (
     <Reveal className="home-menu-card-reveal" delay={index * 80}>
-      <Link className="home-menu-card" to={`/menu/${dish.slug}`} aria-label={`Voir ${dish.title}`}>
-        <div className="home-menu-card-media">
-          <img src={dish.image} alt={dish.alt} loading="lazy" decoding="async" />
-        </div>
-        <div className="home-menu-card-body">
-          <span className="home-menu-card-label">{dish.label}</span>
-          <h3 className="home-menu-card-title">{dish.title}</h3>
-          <p className="home-menu-card-summary">{dish.summary}</p>
-        </div>
-      </Link>
+      <TiltCard>
+        <Link className="home-menu-card" to={`/menu/${dish.slug}`} aria-label={`Voir ${dish.title}`}>
+          <div className="home-menu-card-media">
+            <DishImage dish={dish} sizes="(max-width: 720px) 90vw, 33vw" />
+            <span className="home-menu-card-cta"><ArrowUpRight size={14} strokeWidth={2} /> Voir la fiche</span>
+          </div>
+          <div className="home-menu-card-body">
+            <span className="home-menu-card-label">{dish.label}</span>
+            <h3 className="home-menu-card-title">{dish.title}</h3>
+            <p className="home-menu-card-summary">{dish.summary}</p>
+          </div>
+        </Link>
+      </TiltCard>
     </Reveal>
   );
 }
@@ -42,7 +50,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const img = new Image();
-    img.src = "/assets/brand/box-pomodoro-steam.png";
+    img.src = "/assets/brand/box-pomodoro-steam-960.webp";
     if (img.complete) {
       setHeroReady(true);
     } else {
@@ -58,6 +66,12 @@ export default function HomePage() {
 
   return (
     <>
+      <SEO
+        title="Trattoria italienne à Hydra, Alger"
+        description="Pasta by Galatée — Maison de pâtes fraîches à Hydra. Spaghetti pomodoro, carbonara, tiramisu maison. Livraison ou retrait du mercredi au samedi soir à Alger."
+        path="/"
+        imageAlt="Spaghetti pomodoro dans une box PASTA by Galatée"
+      />
       {/* ═══ HERO v2 — Structure ancienne + box PASTA flottante + fond olive riche ═══ */}
       <section className={`home-hero pbg-hero-v3${heroReady ? " is-ready" : ""}`} id="top" aria-labelledby="home-hero-title">
         <div className="pbg-hero-bg-v3" aria-hidden="true">
@@ -83,7 +97,14 @@ export default function HomePage() {
                 </path>
               </g>
             </svg>
-            <img className="pbg-hero-box-img-v3" src="/assets/brand/box-pomodoro-steam.png" alt="" fetchPriority="high" decoding="async" onLoad={() => setHeroReady(true)} />
+            <picture>
+              <source
+                type="image/webp"
+                srcSet="/assets/brand/box-pomodoro-steam-640.webp 640w, /assets/brand/box-pomodoro-steam-960.webp 960w"
+                sizes="(max-width: 720px) 80vw, 42vw"
+              />
+              <img className="pbg-hero-box-img-v3" src="/assets/brand/box-pomodoro-steam.png" alt="Spaghetti pomodoro dans une box PASTA by Galatée avec basilic frais et vapeur" fetchPriority="high" decoding="async" onLoad={() => setHeroReady(true)} />
+            </picture>
           </div>
 
           <div className="pbg-hero-copy-v3">
@@ -99,10 +120,15 @@ export default function HomePage() {
               Des recettes simples, des ingrédients de qualité,<br />et beaucoup d'amour pour la vraie pasta.
             </p>
             <div className="pbg-hero-actions-v2">
-              <Link className="pbg-hero-cta-primary" to="/commande" onClick={() => trackEvent("order_cta_clicked")}>
+              <ShineCTA
+                as={Link}
+                to="/commande"
+                onClick={() => trackEvent("order_cta_clicked")}
+                className="pbg-hero-cta-primary"
+              >
                 <span>Commander</span>
                 <ArrowUpRight size={16} strokeWidth={1.8} />
-              </Link>
+              </ShineCTA>
               <Link className="pbg-hero-cta-ghost" to="/menu">
                 <span>Voir le menu</span>
               </Link>
@@ -111,6 +137,8 @@ export default function HomePage() {
         </div>
 
       </section>
+
+      <BrandMarquee />
 
       {/* ═══ 01 — MENU PREVIEW (cream) ═══ */}
       <section className="home-section home-menu pbg-section pbg-section-cream" id="home-menu" aria-labelledby="home-menu-title">

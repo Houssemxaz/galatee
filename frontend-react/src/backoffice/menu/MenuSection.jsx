@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { Plus, LayoutGrid, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest, apiMessage } from "../api";
+import { SkeletonRows, EmptyState } from "../shared/primitives.jsx";
 import MenuTable from "./MenuTable.jsx";
 import MenuItemDialog from "./MenuItemDialog.jsx";
 import MenuPreviewDialog from "./MenuPreviewDialog.jsx";
@@ -13,22 +15,21 @@ export default function MenuSection({ token }) {
   const [previewItem, setPreviewItem] = useState(null);
   const [availabilityId, setAvailabilityId] = useState(null);
   const [archivingId, setArchivingId] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = useCallback(async () => {
     setState("loading");
     try {
-      const payload = await apiRequest("/admin/menu");
+      const payload = await apiRequest(`/admin/menu${showArchived ? "?includeArchived=true" : ""}`);
       setItems(payload.menu);
       setState("ready");
     } catch (error) {
       setState("error");
       setAlert({ kind: "error", message: apiMessage(error, "Impossible de charger le menu.") });
     }
-  }, []);
+  }, [showArchived]);
 
-  useEffect(() => {
-    load();
-  }, [load, token]);
+  useEffect(() => { load(); }, [load, token]);
 
   function handleSaved(menuItem) {
     setItems((current) => {
@@ -49,10 +50,7 @@ export default function MenuSection({ token }) {
   }
 
   async function archive(item) {
-    if (archivingId !== item.id) {
-      setArchivingId(item.id);
-      return;
-    }
+    if (archivingId !== item.id) { setArchivingId(item.id); return; }
     setArchivingId(null);
     try {
       const { menuItem } = await apiRequest(`/admin/menu/${encodeURIComponent(item.id)}`, { method: "DELETE" });
@@ -73,30 +71,81 @@ export default function MenuSection({ token }) {
     finally { setAvailabilityId(null); }
   }
 
-  return (
-    <div className="bo-panel">
-      <div className="bo-panel-heading">
-        <div>
-          <p className="bo-eyebrow">Contenu</p>
-          <h2>Menu</h2>
-        </div>
-          <Button type="button" onClick={() => setDialogItem(null)}>Nouvel élément</Button>
-      </div>
+  async function restore(item) {
+    try {
+      const { menuItem } = await apiRequest(`/admin/menu/${encodeURIComponent(item.id)}/restore`, { method: "POST" });
+      handleSaved(menuItem);
+      setAlert({ kind: "success", message: `"${menuItem.current?.title}" est restauré en brouillon.` });
+    } catch (error) {
+      setAlert({ kind: "error", message: apiMessage(error, "La restauration a échoué.") });
+    }
+  }
 
-      {alert && <p className="bo-alert" data-kind={alert.kind} role="status">{alert.message}</p>}
-      {state === "loading" && <p className="bo-empty">Chargement...</p>}
-      {state === "ready" && (
-        <MenuTable
-          items={items}
-          onEdit={setDialogItem}
-          onPreview={setPreviewItem}
-          onPublish={publish}
-          onArchive={archive}
-          onAvailability={toggleAvailability}
-          availabilityId={availabilityId}
-          archivingId={archivingId}
-        />
-      )}
+  return (
+    <div className="bo-page">
+      <section className="bo-table-wrap">
+        <div className="bo-table-heading">
+          <div>
+            <p className="bo-eyebrow">Contenu</p>
+            <h2 className="bo-table-title">Menu</h2>
+          </div>
+          <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+            <label className="bo-availability-toggle" style={{ marginRight: 4 }}>
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(event) => setShowArchived(event.target.checked)}
+              />
+              Afficher les archives
+            </label>
+            <Button type="button" variant="outline" size="sm" onClick={load} aria-label="Rafraîchir le menu">
+              <RefreshCw size={13} strokeWidth={1.8} />
+            </Button>
+            <Button type="button" onClick={() => setDialogItem(null)}>
+              <Plus size={14} strokeWidth={2} />
+              Nouvel élément
+            </Button>
+          </div>
+        </div>
+
+        {alert && <p className="bo-alert" data-kind={alert.kind} role="status" style={{ margin: "12px 16px" }}>{alert.message}</p>}
+
+        {state === "loading" && (
+          <table className="bo-table">
+            <thead>
+              <tr>
+                <th>Élément</th><th>Catégorie</th><th>Statut</th><th>Dispo</th><th>Ordre</th><th>Mis à jour</th><th />
+              </tr>
+            </thead>
+            <tbody>
+              <SkeletonRows rows={4} cols={7} />
+            </tbody>
+          </table>
+        )}
+
+        {state === "error" && (
+          <EmptyState
+            icon={LayoutGrid}
+            title="Impossible de charger le menu"
+            description="Vérifiez la connexion au serveur puis réessayez."
+            actions={<Button variant="outline" size="sm" onClick={load}><RefreshCw size={13} /> Réessayer</Button>}
+          />
+        )}
+
+        {state === "ready" && (
+          <MenuTable
+            items={items}
+            onEdit={setDialogItem}
+            onPreview={setPreviewItem}
+            onPublish={publish}
+            onArchive={archive}
+            onRestore={restore}
+            onAvailability={toggleAvailability}
+            availabilityId={availabilityId}
+            archivingId={archivingId}
+          />
+        )}
+      </section>
 
       <MenuItemDialog
         open={dialogItem !== undefined}

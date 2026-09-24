@@ -36,6 +36,12 @@ export function loginCustomer(body) {
 export function verifyCustomerCode(body) {
   return apiJson("/auth/verify-code", { method: "POST", body: JSON.stringify(body) });
 }
+export function requestCustomerPasswordReset(body) {
+  return apiJson("/auth/request-password-reset", { method: "POST", body: JSON.stringify(body) });
+}
+export function confirmCustomerPasswordReset(body) {
+  return apiJson("/auth/confirm-password-reset", { method: "POST", body: JSON.stringify(body) });
+}
 
 export function fetchCurrentCustomer() {
   return apiJson("/auth/me");
@@ -105,11 +111,13 @@ export const categories = [
   { value: "dolci", label: "Dolci" },
 ];
 
-// Override frontend : la carte affichée montre les box Pasta by Galatée.
-// Le backend garde ses slugs originaux — on remplace ici titre / description /
-// image / catégorie pour aligner avec le nouveau packaging sans toucher au seed.
-const PBG_MENU_OVERRIDE = {
-  "tagliolini-beurre-noisette": {
+// ─── Carte canonique Pasta by Galatée ────────────────────────────────────
+// C'est la source de vérité de la carte publique. Les 3 plats servis dans les
+// box Pasta by Galatée. Utilisée comme fallback si l'API est indisponible
+// et pour remapper les anciens slugs backend legacy.
+const PBG_CANONICAL_MENU = [
+  {
+    id: "spaghetti-pomodoro",
     category: "fresca",
     title: "Spaghetti Pomodoro",
     shortDescription: "Tomates San Marzano, basilic frais, parmesan",
@@ -117,8 +125,10 @@ const PBG_MENU_OVERRIDE = {
     imageUrl: "/assets/pasta-by-galatee/menu-spaghetti-pomodoro-v1.png",
     imageAlt: "Spaghetti Pomodoro servi dans une box Pasta by Galatée",
     priceCents: 2900,
+    available: true,
   },
-  "ravioli-courge-sauge": {
+  {
+    id: "spaghetti-carbonara",
     category: "fresca",
     title: "Spaghetti Carbonara",
     shortDescription: "Guanciale, œuf, pecorino romano, poivre noir",
@@ -126,8 +136,10 @@ const PBG_MENU_OVERRIDE = {
     imageUrl: "/assets/pasta-by-galatee/menu-spaghetti-carbonara-v1.png",
     imageAlt: "Spaghetti Carbonara servi dans une box Pasta by Galatée",
     priceCents: 2700,
+    available: true,
   },
-  "tortelli-betterave-ricotta": {
+  {
+    id: "tiramisu-me-up",
     category: "dolci",
     title: "Tiramisu me up",
     shortDescription: "Mascarpone, café espresso, cacao, chocolat noir",
@@ -135,51 +147,53 @@ const PBG_MENU_OVERRIDE = {
     imageUrl: "/assets/pasta-by-galatee/menu-tiramisu-v1.png",
     imageAlt: "Tiramisu servi dans une box rectangulaire Pasta by Galatée",
     priceCents: 2600,
-  },
-};
-
-function withPbgOverride(item) {
-  const override = PBG_MENU_OVERRIDE[item.id];
-  return override ? { ...item, ...override } : item;
-}
-
-// Keeps the public menu usable during a tunnel/network interruption. The API
-// remains the source of truth whenever it responds successfully.
-const FALLBACK_MENU = [
-  {
-    id: "tagliolini-beurre-noisette",
-    category: "fresca",
-    title: "Tagliolini, beurre noisette",
-    shortDescription: "Truffe noire, parmesan 36 mois",
-    longDescription: "Une pâte fine tirée chaque jour, nappée d'un beurre noisette aux notes de sous-bois. La truffe noire et le parmesan affiné apportent une profondeur nette, sans alourdir l'assiette.",
-    imageUrl: "/assets/menu-tagliolini.png",
-    imageAlt: "Tagliolini frais avec truffe noire et parmesan",
-    priceCents: 2900,
-  },
-  {
-    id: "ravioli-courge-sauge",
-    category: "vegetal",
-    title: "Ravioli de courge, sauge",
-    shortDescription: "Noisette du Piémont, vinaigre de Xérès",
-    longDescription: "La courge rôtie est enveloppée dans une pâte souple, puis servie avec une sauge croustillante, la rondeur de la noisette et quelques gouttes de vinaigre de Xérès.",
-    imageUrl: "/assets/menu-ravioli.png",
-    imageAlt: "Ravioli de courge avec beurre de sauge et noisettes",
-    priceCents: 2700,
-  },
-  {
-    id: "tortelli-betterave-ricotta",
-    category: "ripiena",
-    title: "Tortelli betterave & ricotta",
-    shortDescription: "Huile d'herbes, citron confit",
-    longDescription: "Une farce de betterave rôtie et ricotta fraîche, relevée par le citron confit. L'huile d'herbes termine le plat avec une fraîcheur végétale et précise.",
-    imageUrl: "/assets/menu-tortelli.png",
-    imageAlt: "Tortelli de betterave et ricotta avec herbes fraîches",
-    priceCents: 2600,
+    available: true,
   },
 ];
 
+// Table de conversion des anciens slugs backend legacy vers les 3 plats
+// canoniques. Si le backend renvoie encore ses vieux IDs (seed d'origine),
+// on les remappe complètement — titre, image, prix, description.
+const LEGACY_TO_CANONICAL = {
+  "tagliolini-beurre-noisette": "spaghetti-pomodoro",
+  "ravioli-courge-sauge": "spaghetti-carbonara",
+  "tortelli-betterave-ricotta": "tiramisu-me-up",
+};
+
+const CANONICAL_BY_ID = new Map(PBG_CANONICAL_MENU.map((d) => [d.id, d]));
+
+function withPbgOverride(item) {
+  // Si l'item porte un slug legacy, on le remplace intégralement.
+  const canonicalId = LEGACY_TO_CANONICAL[item.id];
+  if (canonicalId) {
+    const canonical = CANONICAL_BY_ID.get(canonicalId);
+    if (canonical) return { ...canonical, id: canonicalId };
+  }
+  // Si le backend a été mis à jour et renvoie déjà l'ID canonique, on garde
+  // ses données mais on force l'image et l'alt canoniques pour cohérence.
+  const canonical = CANONICAL_BY_ID.get(item.id);
+  if (canonical) {
+    return {
+      ...item,
+      imageUrl: item.imageUrl || canonical.imageUrl,
+      imageAlt: item.imageAlt || canonical.imageAlt,
+    };
+  }
+  return item;
+}
+
+// Utilisé quand l'API est down — on sert directement la carte canonique.
+const FALLBACK_MENU = PBG_CANONICAL_MENU;
+
 export function categoryLabel(value) {
   return categories.find((item) => item.value === value)?.label || value;
+}
+function makeWebpSrcSet(imageUrl) {
+  if (!imageUrl) return "";
+  const match = imageUrl.match(/^(.*)\.(png|jpg|jpeg|webp)$/i);
+  if (!match) return "";
+  const base = match[1];
+  return `${base}-640.webp 640w, ${base}-960.webp 960w`;
 }
 export function toDish(item) {
   return {
@@ -191,6 +205,7 @@ export function toDish(item) {
     title: item.title,
     summary: item.shortDescription,
     image: item.imageUrl,
+    webpSrcSet: makeWebpSrcSet(item.imageUrl),
     alt: item.imageAlt || item.title,
     description: item.longDescription,
     priceCents: item.priceCents || 0,

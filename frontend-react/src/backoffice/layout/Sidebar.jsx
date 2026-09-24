@@ -4,22 +4,22 @@ const NAV_SECTIONS = [
   {
     label: "Opérations",
     items: [
-      { key: "orders", label: "Commandes", Icon: ShoppingBag },
-      { key: "menu", label: "Menu", Icon: LayoutGrid },
-      { key: "delivery", label: "Livraison", Icon: Truck },
+      { key: "orders", label: "Commandes", Icon: ShoppingBag, kbd: "G O" },
+      { key: "menu", label: "Menu", Icon: LayoutGrid, kbd: "G M" },
+      { key: "delivery", label: "Livraison", Icon: Truck, kbd: "G D" },
     ],
   },
   {
     label: "Analytics",
     items: [
-      { key: "stats", label: "Statistiques", Icon: LineChart },
+      { key: "stats", label: "Statistiques", Icon: LineChart, kbd: "G S" },
     ],
   },
   {
     label: "Fidélisation",
     items: [
-      { key: "loyalty", label: "Fidélité", Icon: Gift },
-      { key: "club", label: "Pasta Lover Club", Icon: UsersRound },
+      { key: "loyalty", label: "Fidélité", Icon: Gift, kbd: "G F" },
+      { key: "club", label: "Pasta Lover Club", Icon: UsersRound, kbd: "G C" },
     ],
   },
 ];
@@ -27,16 +27,16 @@ const NAV_SECTIONS = [
 export default function Sidebar({ active, onNavigate }) {
   return (
     <aside className="bo-sidebar" aria-label="Navigation back-office">
-      <a className="bo-sidebar-brand" href="/backoffice.html" aria-label="Galatee — back-office">
+      <a className="bo-sidebar-brand" href="/backoffice.html" aria-label="Galatée — back-office">
         <span className="bo-sidebar-mark" aria-hidden="true">G</span>
-        <span className="bo-sidebar-name">Galatee</span>
+        <span className="bo-sidebar-name">Galatée</span>
       </a>
 
       <nav className="bo-sidebar-nav" aria-label="Sections">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label} className="bo-sidebar-group">
             <p className="bo-sidebar-section-label">{section.label}</p>
-            {section.items.map(({ key, label, Icon }) => {
+            {section.items.map(({ key, label, Icon, kbd }) => {
               const isActive = active === key;
               return (
                 <button
@@ -46,8 +46,9 @@ export default function Sidebar({ active, onNavigate }) {
                   onClick={() => onNavigate(key)}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+                  <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
                   <span>{label}</span>
+                  {kbd && <span className="bo-kbd" aria-hidden="true">{kbd}</span>}
                 </button>
               );
             })}

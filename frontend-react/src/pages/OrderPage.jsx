@@ -156,25 +156,44 @@ export default function OrderPage() {
             )}
 
             {reward && (
-              <GlowCard className="order-reward-wrap">
-                <label className="order-reward-option">
+              <div className={`pbg-reward-card ${form.loyaltyRewardId ? "is-applied" : ""}`}>
+                <label className="pbg-reward-toggle">
                   <input
                     type="checkbox"
                     checked={Boolean(form.loyaltyRewardId)}
                     onChange={(event) => updateForm("loyaltyRewardId", event.target.checked ? reward.id : "")}
                   />
-                  <span>
-                    <strong>🎁 {reward.title}</strong>
-                    <small>Votre récompense fidélité est disponible</small>
+                  <span className="pbg-reward-body">
+                    <span className="pbg-reward-badge">
+                      {reward.rewardType === "fixed" ? `−${reward.rewardValue} DA` : `−${reward.rewardValue}%`}
+                    </span>
+                    <span className="pbg-reward-text">
+                      <strong>🎁 {reward.title}</strong>
+                      <small>
+                        {form.loyaltyRewardId
+                          ? `Vous économisez ${formatDzd(discount)} sur cette commande`
+                          : "Cochez pour appliquer votre récompense fidélité"}
+                      </small>
+                    </span>
                   </span>
                 </label>
-              </GlowCard>
+              </div>
             )}
 
             <div className="order-totals">
-              <p><span>Sous-total</span><strong>{formatDzd(subtotal)}</strong></p>
+              <p>
+                <span>Sous-total</span>
+                {discount > 0
+                  ? <strong className="pbg-total-before"><s>{formatDzd(subtotal)}</s> {formatDzd(subtotal - discount)}</strong>
+                  : <strong>{formatDzd(subtotal)}</strong>}
+              </p>
               <p><span>Livraison</span><strong>À l'étape suivante</strong></p>
-              {discount > 0 && <p className="order-totals-discount"><span>Récompense fidélité</span><strong>− {formatDzd(discount)}</strong></p>}
+              {discount > 0 && (
+                <p className="order-totals-discount">
+                  <span>Récompense fidélité{reward?.rewardType === "percentage" && ` (−${reward.rewardValue}%)`}</span>
+                  <strong>− {formatDzd(discount)}</strong>
+                </p>
+              )}
               <p className="order-total">
                 <span>Total estimé</span>
                 <strong>{formatDzd(totalEstimated)}</strong>

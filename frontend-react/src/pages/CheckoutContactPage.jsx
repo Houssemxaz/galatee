@@ -214,12 +214,29 @@ export default function CheckoutContactPage() {
 
               {/* Recap intégré au formulaire */}
               <div className="order-inline-recap">
-                <p><span>Sous-total</span><strong>{formatDzd(subtotal)}</strong></p>
+                <p>
+                  <span>Sous-total</span>
+                  <strong>{formatDzd(subtotal)}</strong>
+                </p>
                 <p><span>Livraison</span><strong>{form.deliveryMode === "delivery" ? (selectedCommune ? formatDzd(deliveryFee) : "Selon commune") : "Retrait sur place"}</strong></p>
-                {discount > 0 && <p className="order-inline-discount"><span>Récompense</span><strong>− {formatDzd(discount)}</strong></p>}
+                {discount > 0 && (
+                  <p className="order-inline-discount">
+                    <span>
+                      🎁 Récompense fidélité
+                      {reward?.rewardType === "percentage" && ` (−${reward.rewardValue}%)`}
+                      {reward?.rewardType === "fixed" && ` (−${reward.rewardValue} DA)`}
+                    </span>
+                    <strong>− {formatDzd(discount)}</strong>
+                  </p>
+                )}
                 <p className="order-inline-total">
                   <span>Total</span>
-                  <strong>{formatDzd(total)}</strong>
+                  {discount > 0
+                    ? <strong className="pbg-total-with-discount">
+                        <s>{formatDzd(subtotal + deliveryFee)}</s>
+                        <em>{formatDzd(total)}</em>
+                      </strong>
+                    : <strong>{formatDzd(total)}</strong>}
                 </p>
               </div>
 

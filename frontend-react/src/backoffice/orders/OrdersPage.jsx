@@ -37,6 +37,19 @@ export default function OrdersPage() {
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [notificationMessage, setNotificationMessage] = useState("");
   const knownPendingRef = useRef(null);
+  const audioRef = useRef(null);
+  const audioUnlockedRef = useRef(false);
+
+  function ensureAudio() {
+    if (audioRef.current) return audioRef.current;
+    try {
+      const audio = new Audio("/sounds/new-order.wav");
+      audio.preload = "auto";
+      audio.volume = 0.6;
+      audioRef.current = audio;
+      return audio;
+    } catch { return null; }
+  }
 
   function notifyNewOrders(count) {
     if (!count) return;
@@ -45,10 +58,25 @@ export default function OrdersPage() {
     if (notificationPermission === "granted" && typeof Notification !== "undefined") {
       try { new Notification("Galatée · nouvelle commande", { body: message }); } catch { /* Notification can be blocked after permission changes. */ }
     }
+    const audio = audioRef.current;
+    // Silencieux si l utilisateur n a pas encore clique sur "Activer les alertes" — autoplay bloque.
+    if (audio && audioUnlockedRef.current) {
+      try { audio.currentTime = 0; audio.play().catch(() => {}); } catch { /* ignore */ }
+    }
     window.setTimeout(() => setNotificationMessage(""), 7000);
   }
 
   async function enableNotifications() {
+    // Un seul geste utilisateur sert a la fois pour l API Notification et pour debloquer l autoplay audio.
+    const audio = ensureAudio();
+    if (audio && !audioUnlockedRef.current) {
+      try {
+        await audio.play();
+        audio.pause();
+        audio.currentTime = 0;
+        audioUnlockedRef.current = true;
+      } catch { /* autoplay peut echouer si le geste est trop indirect — on retentera au prochain clic */ }
+    }
     if (typeof Notification === "undefined") return;
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
@@ -74,7 +102,9 @@ export default function OrdersPage() {
   }, [notificationPermission]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { const id = setInterval(() => { if (document.visibilityState === "visible") load(); }, 15_000); return () => clearInterval(id); }, [load]);
+  // Le polling continue meme onglet en arriere-plan : le but des alertes sonores est justement
+  // de prevenir sans regarder l ecran.
+  useEffect(() => { const id = setInterval(() => { load(); }, 15_000); return () => clearInterval(id); }, [load]);
 
   // Charge la liste des livreurs actifs pour la dropdown d assignation.
   const loadDrivers = useCallback(async () => {

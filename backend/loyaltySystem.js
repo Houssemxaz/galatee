@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-const QUALIFYING_STATUSES = ["delivered", "withdrawn", "completed"];
+// Une commande compte pour la fidelite des qu elle est confirmee par le
+// restaurant (le client sait qu il progresse sans attendre la livraison).
+// On exclut uniquement pending (pas encore confirme) et cancelled.
+const QUALIFYING_STATUSES = ["confirmed", "preparing", "ready", "delivered", "withdrawn", "completed"];
 const REWARD_TYPES = new Set(["percentage", "fixed"]);
 const DEFAULT_SETTINGS = {
   id: "default",
@@ -62,6 +65,13 @@ export class LoyaltySystem {
       CREATE INDEX IF NOT EXISTS idx_loyalty_rewards_customer_status
         ON loyalty_rewards (customer_id, status, created_at);
     `);
+
+    // Migration : ajoute la colonne eligible_dish_ids si elle n existe pas
+    // deja (JSON serialise ; vide/null = la remise s applique a tous les plats).
+    const columns = this.db.prepare("PRAGMA table_info(loyalty_settings)").all();
+    if (!columns.some((column) => column.name === "eligible_dish_ids")) {
+      this.db.exec("ALTER TABLE loyalty_settings ADD COLUMN eligible_dish_ids TEXT");
+    }
   }
 
   seedSettings() {
@@ -93,7 +103,7 @@ export class LoyaltySystem {
     this.db.prepare(`
       UPDATE loyalty_settings
       SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?,
-          title = ?, description = ?, active = ?, updated_at = ?
+          title = ?, description = ?, active = ?, eligible_dish_ids = ?, updated_at = ?
       WHERE id = 'default'
     `).run(
       settings.threshold,
@@ -102,6 +112,7 @@ export class LoyaltySystem {
       settings.title,
       settings.description,
       settings.active ? 1 : 0,
+      settings.eligibleDishIds.length ? JSON.stringify(settings.eligibleDishIds) : null,
       timestamp,
     );
     return this.getSettings();
@@ -159,7 +170,10 @@ export class LoyaltySystem {
     };
   }
 
-  previewReward(customerId, rewardId, subtotalCents) {
+  // Prend soit un montant total (subtotalCents), soit une liste d items
+  // pour calculer un montant eligible (uniquement les plats concernes par
+  // la promo si le settings.eligibleDishIds n est pas vide).
+  previewReward(customerId, rewardId, subtotalCents, items = null) {
     if (!customerId || !rewardId) return null;
     const subtotal = Number(subtotalCents);
     if (!Number.isInteger(subtotal) || subtotal < 0) {
@@ -171,14 +185,30 @@ export class LoyaltySystem {
       WHERE id = ? AND customer_id = ? AND status = 'available'
     `).get(rewardId, customerId);
     if (!row) return null;
+
+    const settings = this.getSettings();
+    const eligibleIds = settings.eligibleDishIds || [];
+    let eligibleAmount = subtotal;
+    if (eligibleIds.length && Array.isArray(items)) {
+      eligibleAmount = items
+        .filter((item) => eligibleIds.includes(item.productId || item.id))
+        .reduce((sum, item) => sum + (item.lineTotalCents || 0), 0);
+    }
+
     const discountCents = row.reward_type === "fixed"
-      ? Math.min(subtotal, row.reward_value * 100)
-      : Math.min(subtotal, Math.floor(subtotal * row.reward_value / 100));
-    return { id: row.id, title: row.title, discountCents };
+      ? Math.min(eligibleAmount, row.reward_value * 100)
+      : Math.min(eligibleAmount, Math.floor(eligibleAmount * row.reward_value / 100));
+    return {
+      id: row.id,
+      title: row.title,
+      discountCents,
+      eligibleAmountCents: eligibleAmount,
+      appliesToAllDishes: eligibleIds.length === 0,
+    };
   }
 
-  applyReward(customerId, rewardId, subtotalCents, orderId) {
-    const reward = this.previewReward(customerId, rewardId, subtotalCents);
+  applyReward(customerId, rewardId, subtotalCents, orderId, items = null) {
+    const reward = this.previewReward(customerId, rewardId, subtotalCents, items);
     if (!reward) {
       throw new LoyaltyError("LOYALTY_REWARD_UNAVAILABLE", "This loyalty reward is no longer available.", 409);
     }
@@ -234,6 +264,12 @@ function normalizeSettings(input) {
   }
   const title = normalizeText(input.title, "LOYALTY_TITLE_INVALID", 120);
   const description = normalizeText(input.description, "LOYALTY_DESCRIPTION_INVALID", 300, true);
+  const eligibleDishIds = Array.isArray(input.eligibleDishIds)
+    ? input.eligibleDishIds
+        .filter((id) => typeof id === "string" && id.trim())
+        .map((id) => id.trim())
+        .slice(0, 100)
+    : [];
   return {
     threshold,
     rewardType,
@@ -241,6 +277,7 @@ function normalizeSettings(input) {
     title,
     description,
     active: input.active !== false && Number(input.active) !== 0,
+    eligibleDishIds,
   };
 }
 
@@ -253,6 +290,13 @@ function normalizeText(value, code, maxLength, allowEmpty = false) {
 }
 
 function mapSettingsRow(row) {
+  let eligibleDishIds = [];
+  if (row.eligible_dish_ids) {
+    try {
+      const parsed = JSON.parse(row.eligible_dish_ids);
+      if (Array.isArray(parsed)) eligibleDishIds = parsed.filter((id) => typeof id === "string");
+    } catch { /* colonne mal formee : on ignore */ }
+  }
   return {
     threshold: row.qualifying_order_threshold,
     rewardType: row.reward_type,
@@ -260,6 +304,7 @@ function mapSettingsRow(row) {
     title: row.title,
     description: row.description,
     active: Boolean(row.active),
+    eligibleDishIds,
     updatedAt: row.updated_at,
   };
 }

@@ -182,7 +182,7 @@ export class OrderSystem {
     const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
     const deliveryFeeCents = commune?.feeCents || 0;
     const reward = normalized.loyaltyRewardId
-      ? this.loyalty?.previewReward(customerId, normalized.loyaltyRewardId, subtotalCents)
+      ? this.loyalty?.previewReward(customerId, normalized.loyaltyRewardId, subtotalCents, items)
       : null;
     if (normalized.loyaltyRewardId && !reward) {
       throw new OrderError("LOYALTY_REWARD_UNAVAILABLE", "This loyalty reward is no longer available.", 409);
@@ -230,7 +230,7 @@ export class OrderSystem {
       }
       this.db.prepare("INSERT INTO order_status_history (order_id, status, changed_at) VALUES (?, ?, ?)")
         .run(order.id, "pending", timestamp);
-      if (reward) this.loyalty.applyReward(customerId, reward.id, subtotalCents, order.id);
+      if (reward) this.loyalty.applyReward(customerId, reward.id, subtotalCents, order.id, items);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");

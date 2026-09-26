@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Check, Gift, LogOut, Mail, MapPin, Phone, Sparkles, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowUpRight, Check, Gift, LogOut, Mail, MapPin, Phone, Sparkles, UserPlus,
+  UtensilsCrossed, ClipboardList, ShoppingBag, HeartHandshake, Repeat2, Utensils,
+  Calendar,
+} from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +13,7 @@ import SEO from "@/components/SEO";
 import { Link004 } from "@/components/ui/skiper-ui/skiper40";
 import { fetchCustomerOrders } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
+import { useCart } from "@/context/CartContext";
 
 function errorMessage(error) {
   if (error?.code === "AUTH_CODE_TOO_SOON") return "Un code vient déjà d'être envoyé. Patientez une minute avant de recommencer.";
@@ -215,13 +220,170 @@ export function CustomerAccessForm() {
   );
 }
 
+function MemberBadge({ account, loyalty, orders }) {
+  const memberSince = account.createdAt
+    ? new Date(account.createdAt).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
+    : null;
+  const qualifyingOrders = loyalty?.qualifyingOrders ?? orders.length;
+  const reward = loyalty?.rewardAvailable;
+  const remaining = loyalty?.ordersToNextReward ?? 0;
+
+  return (
+    <div className={`pbg-member-badge ${reward ? "is-reward" : ""}`}>
+      <div className="pbg-member-badge-glow" aria-hidden="true" />
+
+      <div className="pbg-member-badge-head">
+        <span className="pbg-member-badge-stamp" aria-hidden="true">
+          <Gift size={22} strokeWidth={1.5} />
+        </span>
+        <div>
+          <p className="pbg-member-badge-eyebrow">Carte membre</p>
+          <h2 className="pbg-member-badge-name">{account.firstName}</h2>
+        </div>
+      </div>
+
+      {memberSince && (
+        <p className="pbg-member-badge-since">
+          <Calendar size={12} strokeWidth={2} />
+          <span>Membre depuis {memberSince}</span>
+        </p>
+      )}
+
+      <div className="pbg-member-badge-stats">
+        <div>
+          <span>Commandes</span>
+          <strong>{qualifyingOrders}</strong>
+        </div>
+        <i />
+        <div>
+          <span>Fidélité</span>
+          <strong>
+            {reward
+              ? "Débloquée"
+              : remaining === 0
+                ? "—"
+                : `${remaining} restants`}
+          </strong>
+        </div>
+      </div>
+
+      <p className="pbg-member-badge-signature">Pasta. Music. Memories.</p>
+    </div>
+  );
+}
+
+function StampPreview({ loyalty }) {
+  if (!loyalty?.settings?.active) return null;
+  const threshold = loyalty.settings.threshold || 10;
+  const reward = loyalty.rewardAvailable;
+  const progress = reward ? threshold : Math.min(threshold, loyalty.progressInCycle || 0);
+  const remaining = Math.max(0, threshold - progress);
+  const stamps = Array.from({ length: threshold }, (_, i) => i < progress);
+
+  return (
+    <article className={`pbg-aside-card pbg-aside-stamps ${reward ? "is-reward" : ""}`}>
+      <div className="pbg-aside-head">
+        <span className="pbg-aside-icon-round" aria-hidden="true">
+          {reward ? <Gift size={16} strokeWidth={1.7} /> : <Sparkles size={16} strokeWidth={1.7} />}
+        </span>
+        <div>
+          <p className="pbg-aside-eyebrow">Programme fidélité</p>
+          <h3 className="pbg-aside-title">
+            {reward
+              ? "Récompense débloquée"
+              : progress === 0
+                ? "Chaque plat compte"
+                : `${remaining} plat${remaining > 1 ? "s" : ""} avant la promo`}
+          </h3>
+        </div>
+      </div>
+      <div className="pbg-aside-stamps-grid" role="img" aria-label={`${progress} sur ${threshold}`}>
+        {stamps.map((filled, i) => (
+          <span key={i} className={`pbg-aside-stamp ${filled ? "is-filled" : ""}`}>
+            <Utensils size={11} strokeWidth={2} />
+          </span>
+        ))}
+      </div>
+      <div className="pbg-aside-stamps-foot">
+        <span><strong>{progress}</strong> / {threshold}</span>
+        <Link to="/compte/commandes" className="pbg-aside-inline-link">
+          Voir <ArrowUpRight size={12} strokeWidth={2} />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function LastOrderCard({ order, onReorder }) {
+  if (!order) return null;
+  const items = order.items || [];
+  const preview = items.slice(0, 2).map((it) => `${it.quantity}× ${it.title}`).join(" · ");
+  const extra = items.length > 2 ? ` +${items.length - 2}` : "";
+  const dateLabel = new Date(order.createdAt).toLocaleDateString("fr-FR", {
+    day: "2-digit", month: "long",
+  });
+
+  return (
+    <article className="pbg-aside-card pbg-aside-last-order">
+      <div className="pbg-aside-head">
+        <span className="pbg-aside-icon-round" aria-hidden="true">
+          <ClipboardList size={16} strokeWidth={1.7} />
+        </span>
+        <div>
+          <p className="pbg-aside-eyebrow">Dernière commande</p>
+          <h3 className="pbg-aside-title">
+            {order.deliveryMode === "delivery" ? "Livraison" : "Retrait chez Galatée"}
+          </h3>
+        </div>
+      </div>
+      <p className="pbg-aside-last-order-date">{dateLabel}</p>
+      <p className="pbg-aside-last-order-items">{preview}{extra}</p>
+      <button
+        type="button"
+        className="pbg-aside-reorder"
+        onClick={() => onReorder(order)}
+        disabled={items.length === 0}
+      >
+        <Repeat2 size={13} strokeWidth={2} />
+        <span>Commander la même chose</span>
+      </button>
+    </article>
+  );
+}
+
+function QuickShortcuts() {
+  const items = [
+    { to: "/menu", label: "Voir la carte", icon: UtensilsCrossed },
+    { to: "/commande", label: "Nouvelle commande", icon: ShoppingBag },
+    { to: "/compte/commandes", label: "Mes commandes", icon: ClipboardList },
+    { to: "/pasta-lover-club", label: "Rejoindre le Club", icon: HeartHandshake },
+  ];
+  return (
+    <article className="pbg-aside-card pbg-aside-shortcuts">
+      <div className="pbg-aside-head pbg-aside-head-simple">
+        <p className="pbg-aside-eyebrow">Raccourcis</p>
+      </div>
+      <div className="pbg-aside-shortcuts-grid">
+        {items.map(({ to, label, icon: Icon }) => (
+          <Link key={to} to={to} className="pbg-aside-shortcut">
+            <Icon size={17} strokeWidth={1.6} />
+            <span>{label}</span>
+            <ArrowUpRight size={12} strokeWidth={2} className="pbg-aside-shortcut-arrow" />
+          </Link>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 function LoyaltyMini({ loyalty }) {
   if (!loyalty?.settings?.active) return null;
   const threshold = loyalty.settings.threshold || 10;
-  const progress = loyalty.progressInCycle || 0;
+  const reward = loyalty.rewardAvailable;
+  // Cycle plein (X/X) quand la recompense est prete, sinon progression brute.
+  const progress = reward ? threshold : (loyalty.progressInCycle || 0);
   const remaining = loyalty.ordersToNextReward || 0;
   const percent = Math.min(100, (progress / threshold) * 100);
-  const reward = loyalty.rewardAvailable;
 
   return (
     <div className={`pbg-carnet-loyalty ${reward ? "is-reward" : ""}`}>
@@ -246,16 +408,40 @@ function LoyaltyMini({ loyalty }) {
 
 export default function AccountPage() {
   const { account, loading, logout } = useCustomerAuth();
+  const { replace: replaceCart } = useCart();
+  const navigate = useNavigate();
   const [loyalty, setLoyalty] = useState(null);
+  const [orders, setOrders] = useState([]);
 
   useEffect(() => {
     if (!account) return undefined;
     let cancelled = false;
     fetchCustomerOrders()
-      .then((payload) => { if (!cancelled) setLoyalty(payload.loyalty || null); })
+      .then((payload) => {
+        if (cancelled) return;
+        setLoyalty(payload.loyalty || null);
+        setOrders(payload.orders || []);
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [account]);
+
+  const lastOrder = useMemo(() => {
+    if (!orders.length) return null;
+    return [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+  }, [orders]);
+
+  function reorder(order) {
+    const nextCart = {};
+    (order.items || []).forEach((it) => {
+      const id = it.productId;
+      if (!id) return;
+      nextCart[id] = (nextCart[id] || 0) + (it.quantity || 1);
+    });
+    if (Object.keys(nextCart).length === 0) return;
+    replaceCart(nextCart);
+    navigate("/commande");
+  }
 
   if (loading) return <div className="page page-account pbg-page pbg-page-cream"><div className="pbg-page-shell account-loading">Chargement de votre espace…</div></div>;
 
@@ -290,12 +476,30 @@ export default function AccountPage() {
 
       <section className="pbg-account-hero">
         <div className="pbg-page-shell">
-          <Reveal>
+          <Reveal className="pbg-account-hero-copy">
             <p className="pbg-account-eyebrow">Votre espace Galatée</p>
             <h1 className="pbg-account-title">
               Bonjour,<br /><em>{account.firstName}.</em>
             </h1>
-            <p className="pbg-account-lede">Votre carnet est prêt. Commandez quand vous voulez.</p>
+            <p className="pbg-account-lede">
+              Votre carnet est prêt. Retrouvez vos commandes, votre progression fidélité,
+              et un accès rapide à la carte du jour.
+            </p>
+            <div className="pbg-account-hero-ctas">
+              <Link to="/commande" className="pbg-btn pbg-btn-primary pbg-account-hero-cta">
+                <span>Passer une commande</span>
+                <ArrowUpRight size={16} strokeWidth={1.6} />
+              </Link>
+              <Link to="/menu" className="pbg-account-hero-secondary">
+                <span>Voir la carte</span>
+                <ArrowUpRight size={14} strokeWidth={1.8} />
+              </Link>
+            </div>
+          </Reveal>
+
+          {/* Carte "membre" decorative - desktop uniquement */}
+          <Reveal className="pbg-account-hero-side" delay={120}>
+            <MemberBadge account={account} loyalty={loyalty} orders={orders} />
           </Reveal>
         </div>
       </section>
@@ -340,6 +544,13 @@ export default function AccountPage() {
               <LogOut size={13} strokeWidth={1.7} /> Se déconnecter
             </button>
           </Reveal>
+
+          {/* Colonne droite - affichee uniquement en desktop (CSS gere le hidden mobile) */}
+          <aside className="pbg-account-aside" aria-label="Vos infos rapides">
+            <Reveal delay={100}><StampPreview loyalty={loyalty} /></Reveal>
+            {lastOrder && <Reveal delay={180}><LastOrderCard order={lastOrder} onReorder={reorder} /></Reveal>}
+            <Reveal delay={260}><QuickShortcuts /></Reveal>
+          </aside>
         </div>
       </section>
     </div>

@@ -20,7 +20,7 @@ export default function OrderPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { account } = useCustomerAuth();
-  const { cart, set: setCartItem, replace: replaceCart } = useCart();
+  const { cart, set: setCartItem } = useCart();
   const { form, update: updateForm } = useCheckoutForm();
   const toast = useToast();
   const [menu, setMenu] = useState([]);
@@ -32,13 +32,11 @@ export default function OrderPage() {
     fetchMenu().then((items) => {
       if (cancelled) return;
       setMenu(items);
+      // On ajoute uniquement le plat demande via ?dish=xxx quand il n est pas
+      // deja au panier. Sinon on respecte l etat du panier (vide inclus) pour
+      // que l utilisateur retrouve exactement ce qu il a laisse.
       const requested = searchParams.get("dish");
-      const hasCart = Object.keys(cart || {}).length > 0;
-      if (!hasCart) {
-        const firstAvailable = items.find((item) => item.available);
-        const selected = items.find((item) => item.id === requested && item.available) || firstAvailable;
-        if (selected) replaceCart({ [selected.id]: 1 });
-      } else if (requested && items.find((item) => item.id === requested && item.available) && !cart[requested]) {
+      if (requested && items.find((item) => item.id === requested && item.available) && !cart[requested]) {
         setCartItem(requested, 1);
       }
       setState("ready");
@@ -57,8 +55,17 @@ export default function OrderPage() {
   );
   const subtotal = lines.reduce((sum, item) => sum + item.lineTotal, 0);
   const reward = loyalty?.rewardAvailable;
+  const eligibleIds = loyalty?.settings?.eligibleDishIds || [];
+  const eligibleSubtotal = eligibleIds.length
+    ? lines.filter((item) => eligibleIds.includes(item.id)).reduce((sum, item) => sum + item.lineTotal, 0)
+    : subtotal;
+  const eligibleTitles = eligibleIds.length
+    ? lines.filter((item) => eligibleIds.includes(item.id)).map((item) => item.title)
+    : [];
   const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId
-    ? reward.rewardType === "fixed" ? Math.min(subtotal, reward.rewardValue * 100) : Math.min(subtotal, Math.floor(subtotal * reward.rewardValue / 100))
+    ? reward.rewardType === "fixed"
+      ? Math.min(eligibleSubtotal, reward.rewardValue * 100)
+      : Math.min(eligibleSubtotal, Math.floor(eligibleSubtotal * reward.rewardValue / 100))
     : 0;
   const totalEstimated = Math.max(0, subtotal - discount);
 
@@ -162,6 +169,7 @@ export default function OrderPage() {
                     type="checkbox"
                     checked={Boolean(form.loyaltyRewardId)}
                     onChange={(event) => updateForm("loyaltyRewardId", event.target.checked ? reward.id : "")}
+                    disabled={eligibleIds.length > 0 && eligibleSubtotal === 0}
                   />
                   <span className="pbg-reward-body">
                     <span className="pbg-reward-badge">
@@ -170,9 +178,13 @@ export default function OrderPage() {
                     <span className="pbg-reward-text">
                       <strong>🎁 {reward.title}</strong>
                       <small>
-                        {form.loyaltyRewardId
-                          ? `Vous économisez ${formatDzd(discount)} sur cette commande`
-                          : "Cochez pour appliquer votre récompense fidélité"}
+                        {eligibleIds.length > 0 && eligibleSubtotal === 0
+                          ? `Ajoutez ${eligibleTitles.length ? eligibleTitles.join(" ou ") : "un plat éligible"} pour activer votre remise`
+                          : form.loyaltyRewardId
+                            ? `Vous économisez ${formatDzd(discount)}${eligibleIds.length ? ` sur ${eligibleTitles.join(", ")}` : " sur cette commande"}`
+                            : eligibleIds.length
+                              ? `Remise appliquée uniquement sur : ${eligibleTitles.join(", ")}`
+                              : "Cochez pour appliquer votre récompense fidélité"}
                       </small>
                     </span>
                   </span>

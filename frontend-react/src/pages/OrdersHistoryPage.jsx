@@ -25,9 +25,11 @@ function formatCurrency(cents) {
 
 function LoyaltyStampCard({ loyalty }) {
   const threshold = loyalty?.settings?.threshold || 10;
-  const progress = Math.min(threshold, loyalty?.progressInCycle || 0);
-  const remaining = Math.max(0, threshold - progress);
   const reward = loyalty?.rewardAvailable;
+  // Quand une recompense est disponible, la carte doit afficher un cycle
+  // complet (10/10) meme si progressInCycle est retombe a 0 apres modulo.
+  const progress = reward ? threshold : Math.min(threshold, loyalty?.progressInCycle || 0);
+  const remaining = Math.max(0, threshold - progress);
   const stamps = Array.from({ length: threshold }, (_, i) => i < progress);
 
   return (

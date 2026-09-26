@@ -1404,6 +1404,25 @@ button[data-slot="button"]:focus-visible {
 .bo-loyalty-fields label { display: flex; flex-direction: column; gap: 7px; color: var(--bo-ink-soft); font-size: 12px; font-weight: 600; }
 .bo-loyalty-fields input, .bo-loyalty-fields select, .bo-loyalty-fields textarea { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--bo-hairline-strong); border-radius: var(--bo-radius); background: var(--bo-cream-3); color: var(--bo-ink); font: inherit; font-weight: 400; resize: vertical; }
 .bo-loyalty-field-wide { grid-column: span 2; }
+
+/* Portée de la remise : tous les plats ou selection */
+.bo-loyalty-scope { margin: 8px 0 24px; padding: 22px; background: var(--bo-cream-3); border: 1px solid var(--bo-hairline); border-radius: var(--bo-radius); }
+.bo-loyalty-scope-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.bo-loyalty-scope-head h4 { margin: 4px 0 0; color: var(--bo-ink); font-size: 14px; font-weight: 600; }
+.bo-loyalty-scope-toggle { display: inline-flex; padding: 3px; background: var(--bo-cream-2); border: 1px solid var(--bo-hairline-strong); border-radius: 999px; }
+.bo-loyalty-scope-tab { padding: 7px 14px; background: transparent; border: none; border-radius: 999px; color: var(--bo-ink-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: background .18s ease, color .18s ease; }
+.bo-loyalty-scope-tab.is-active { background: var(--bo-ink); color: var(--bo-cream); }
+.bo-loyalty-dish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.bo-loyalty-dish { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 10px; padding: 11px 14px; background: var(--bo-cream); border: 1px solid var(--bo-hairline); border-radius: var(--bo-radius); cursor: pointer; transition: border-color .18s ease, background .18s ease; }
+.bo-loyalty-dish:hover { border-color: var(--bo-hairline-strong); }
+.bo-loyalty-dish.is-selected { background: var(--bo-cream-2); border-color: var(--bo-terracotta); box-shadow: 0 0 0 1px var(--bo-terracotta) inset; }
+.bo-loyalty-dish input { position: absolute; opacity: 0; pointer-events: none; }
+.bo-loyalty-dish-check { display: grid; place-items: center; width: 20px; height: 20px; background: var(--bo-cream-3); border: 1px solid var(--bo-hairline-strong); border-radius: 6px; color: transparent; transition: all .18s ease; }
+.bo-loyalty-dish.is-selected .bo-loyalty-dish-check { background: var(--bo-terracotta); border-color: var(--bo-terracotta); color: var(--bo-cream); }
+.bo-loyalty-dish-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bo-loyalty-dish-body strong { color: var(--bo-ink); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bo-loyalty-dish-body small { color: var(--bo-ink-muted); font-size: 11px; }
+
 .bo-loyalty-actions { padding-top: 18px; border-top: 1px solid var(--bo-hairline); color: var(--bo-ink-muted); font-size: 12px; }
 .bo-loyalty-search { display: flex; align-items: center; gap: 8px; width: min(340px, 100%); color: var(--bo-ink-muted); }
 .bo-loyalty-search input { min-height: 38px; }

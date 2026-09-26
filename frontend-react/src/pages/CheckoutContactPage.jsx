@@ -58,8 +58,14 @@ export default function CheckoutContactPage() {
   const selectedCommune = communes.find((commune) => commune.id === form.communeId);
   const deliveryFee = form.deliveryMode === "delivery" ? (selectedCommune?.feeCents || 0) : 0;
   const reward = loyalty?.rewardAvailable;
+  const eligibleIds = loyalty?.settings?.eligibleDishIds || [];
+  const eligibleSubtotal = eligibleIds.length
+    ? lines.filter((item) => eligibleIds.includes(item.id)).reduce((sum, item) => sum + item.lineTotal, 0)
+    : subtotal;
   const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId
-    ? reward.rewardType === "fixed" ? Math.min(subtotal, reward.rewardValue * 100) : Math.min(subtotal, Math.floor(subtotal * reward.rewardValue / 100))
+    ? reward.rewardType === "fixed"
+      ? Math.min(eligibleSubtotal, reward.rewardValue * 100)
+      : Math.min(eligibleSubtotal, Math.floor(eligibleSubtotal * reward.rewardValue / 100))
     : 0;
   const total = Math.max(0, subtotal + deliveryFee - discount);
 

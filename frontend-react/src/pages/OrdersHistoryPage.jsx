@@ -70,6 +70,13 @@ function LoyaltyStampCard({ loyalty }) {
           ? reward.title
           : "À 10 plats commandés, un dessert offert à la maison."}
       </p>
+      {reward?.expiresAt && (
+        <p className="pbg-stamp-expiry">
+          Récompense valable jusqu'au {new Date(reward.expiresAt).toLocaleDateString("fr-FR", {
+            day: "2-digit", month: "long", year: "numeric",
+          })}
+        </p>
+      )}
 
       <Link to="/commande" className="pbg-btn pbg-btn-primary pbg-stamp-cta">
         <span>Passer une commande</span>

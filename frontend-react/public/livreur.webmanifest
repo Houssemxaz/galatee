@@ -1,0 +1,21 @@
+{
+  "name": "Livreurs — Pasta by Galatée",
+  "short_name": "PBG Livreurs",
+  "description": "App des livreurs Pasta by Galatée.",
+  "start_url": "/livreur",
+  "scope": "/livreur",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5EFE4",
+  "theme_color": "#D0362B",
+  "lang": "fr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

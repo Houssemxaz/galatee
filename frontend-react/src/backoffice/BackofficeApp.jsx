@@ -8,6 +8,7 @@ import OrdersPage from "./orders/OrdersPage.jsx";
 import LoyaltyPage from "./loyalty/LoyaltyPage.jsx";
 import ClubPage from "./club/ClubPage.jsx";
 import DeliveryPage from "./delivery/DeliveryPage.jsx";
+import DriversPage from "./drivers/DriversPage.jsx";
 
 const SECTIONS = {
   orders: { label: "Commandes", render: () => <OrdersPage /> },
@@ -16,6 +17,7 @@ const SECTIONS = {
   loyalty: { label: "Fidélité", render: () => <LoyaltyPage /> },
   club: { label: "Pasta Lover Club", render: () => <ClubPage /> },
   delivery: { label: "Livraison", render: () => <DeliveryPage /> },
+  drivers: { label: "Livreurs", render: () => <DriversPage /> },
 };
 
 // Linear-style: `g` puis lettre → naviguer.
@@ -26,6 +28,7 @@ const G_SHORTCUTS = {
   s: "stats",
   f: "loyalty",
   c: "club",
+  l: "drivers",
 };
 
 export default function BackofficeApp() {

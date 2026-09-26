@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
 
+// Cycle de vie simplifie : 4 statuts + cancelled.
+// - pending    : en attente de confirmation par le restaurant
+// - confirmed  : accepte par le resto (visible dans le pool livreur si delivery)
+// - ready      : prete a etre recuperee (par le livreur ou le client en pickup)
+// - delivered  : livree (par livreur) ou retiree (par client)
+// - cancelled  : annulee (par resto, par client, ou par livreur avec motif)
 const ORDER_STATUSES = new Set([
   "pending",
   "confirmed",
-  "cancelled",
-  "preparing",
   "ready",
   "delivered",
-  "withdrawn",
-  "completed",
+  "cancelled",
 ]);
 const DELIVERY_MODES = new Set(["delivery", "pickup"]);
 const PAYMENT_METHOD = "cash_on_delivery";
@@ -112,6 +115,28 @@ export class OrderSystem {
     if (!orderColumns.some((column) => column.name === "loyalty_reward_id")) {
       this.db.exec("ALTER TABLE orders ADD COLUMN loyalty_reward_id TEXT");
     }
+    // Champs livreur : assignation manuelle depuis le backoffice puis suivi
+    // du parcours de livraison (en route, livree).
+    if (!orderColumns.some((column) => column.name === "assigned_driver_id")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN assigned_driver_id TEXT");
+      this.db.exec("CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders (assigned_driver_id, status)");
+    }
+    if (!orderColumns.some((column) => column.name === "driver_assigned_at")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN driver_assigned_at TEXT");
+    }
+    if (!orderColumns.some((column) => column.name === "driver_started_at")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN driver_started_at TEXT");
+    }
+    if (!orderColumns.some((column) => column.name === "delivered_at")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN delivered_at TEXT");
+    }
+    // Migration statuts : simplification a 4 statuts + cancelled.
+    // 'preparing' devient 'confirmed' (accepte mais pas encore pret).
+    // 'withdrawn' et 'completed' deviennent 'delivered'.
+    this.db.exec(`
+      UPDATE orders SET status = 'confirmed' WHERE status = 'preparing';
+      UPDATE orders SET status = 'delivered' WHERE status IN ('withdrawn', 'completed');
+    `);
   }
 
   seedCommunes() {
@@ -388,6 +413,10 @@ export class OrderSystem {
       loyaltyRewardId: row.loyalty_reward_id || null,
       totalCents: row.total_cents,
       total: formatAmount(row.total_cents),
+      assignedDriverId: row.assigned_driver_id || null,
+      driverAssignedAt: row.driver_assigned_at || null,
+      driverStartedAt: row.driver_started_at || null,
+      deliveredAt: row.delivered_at || null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -470,10 +499,8 @@ function validateDateFilter(value) {
 
 function nextStatuses(order) {
   if (order.status === "pending") return ["confirmed", "cancelled"];
-  if (order.status === "confirmed") return ["preparing", "cancelled"];
-  if (order.status === "preparing") return ["ready", "cancelled"];
-  if (order.status === "ready") return [order.deliveryMode === "delivery" ? "delivered" : "withdrawn"];
-  if (order.status === "delivered" || order.status === "withdrawn") return ["completed"];
+  if (order.status === "confirmed") return ["ready", "cancelled"];
+  if (order.status === "ready") return ["delivered", "cancelled"];
   return [];
 }
 

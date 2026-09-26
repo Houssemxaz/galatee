@@ -12,6 +12,7 @@ import { MenuError, MenuSystem } from "./menuSystem.js";
 import { OrderError, OrderSystem } from "./orderSystem.js";
 import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
+import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
 import {
   ReservationError,
   ReservationSystem,
@@ -37,6 +38,7 @@ const orderSystem = new OrderSystem({ db: reservationSystem.store.db, menu: menu
 const analyticsSystem = new AnalyticsSystem({ db: reservationSystem.store.db });
 const customerAuthSystem = new CustomerAuthSystem({ db: reservationSystem.store.db });
 const clubSystem = new ClubSystem({ db: reservationSystem.store.db });
+const driverSystem = new DriverSystem({ db: reservationSystem.store.db });
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -59,6 +61,7 @@ export function createApp({
   analytics = analyticsSystem,
   customerAuth = customerAuthSystem,
   club = clubSystem,
+  drivers = driverSystem,
   requiredAdminToken = adminToken,
   corsAllowedOrigin = allowedOrigin,
 } = {}) {
@@ -121,38 +124,6 @@ export function createApp({
         return sendJson(response, 200, { loggedOut: true }, {
           "Set-Cookie": buildSessionCookie("", request, 0),
         });
-      }
-
-      if (url.pathname === "/api/account/reservations" && request.method === "GET") {
-        const session = requireCustomerSession(customerAuth, request);
-        return sendJson(response, 200, await system.listCustomerReservations(session.account.id));
-      }
-
-      if (url.pathname === "/api/availability" && request.method === "GET") {
-        const payload = await system.getAvailability({
-          date: url.searchParams.get("date"),
-          partySize: url.searchParams.get("partySize"),
-          tableType: url.searchParams.get("tableType"),
-        });
-        return sendJson(response, 200, payload);
-      }
-
-      if (url.pathname === "/api/reservations" && request.method === "POST") {
-        const body = await readJsonBody(request);
-        const session = customerAuth.getSession(request);
-        const reservationBody = session
-          ? {
-            ...body,
-            firstName: body.firstName || session.account.firstName,
-            lastName: body.lastName || session.account.lastName,
-            phone: body.phone || session.account.phone,
-            email: body.email || session.account.email,
-          }
-          : body;
-        const payload = await system.createReservation(reservationBody, {
-          customerId: session?.account.id || null,
-        });
-        return sendJson(response, 201, payload);
       }
 
       if (url.pathname === "/api/delivery-communes" && request.method === "GET") {
@@ -368,102 +339,144 @@ export function createApp({
         return sendJson(response, 200, { event: club.deleteEvent(decodeURIComponent(clubEventMatch[1])) });
       }
 
-      if (url.pathname === "/api/admin/reservations" && request.method === "GET") {
+
+      // ═══ LIVREURS — Admin : gestion CRUD + assignation ═══
+      if (url.pathname === "/api/admin/drivers" && request.method === "GET") {
         assertAdminAuthorized(request, requiredAdminToken);
-        const payload = await system.listReservations({
-          date: url.searchParams.get("date"),
-          status: url.searchParams.get("status"),
-        });
-        return sendJson(response, 200, payload);
+        const includeInactive = url.searchParams.get("includeInactive") === "true";
+        const list = drivers.list({ includeInactive });
+        const enriched = list.map((driver) => ({ ...driver, stats: drivers.getStats(driver.id) }));
+        return sendJson(response, 200, { drivers: enriched });
       }
 
-      const reservationStatusMatch = url.pathname.match(/^\/api\/admin\/reservations\/([^/]+)\/status$/);
-      if (reservationStatusMatch && request.method === "PATCH") {
+      if (url.pathname === "/api/admin/drivers" && request.method === "POST") {
         assertAdminAuthorized(request, requiredAdminToken);
         const body = await readJsonBody(request);
-        const payload = await system.updateReservationStatus(decodeURIComponent(reservationStatusMatch[1]), body.status);
-        return sendJson(response, 200, payload);
+        return sendJson(response, 201, { driver: drivers.create(body) });
       }
 
-      if (url.pathname === "/api/admin/availability" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        const payload = await system.getAdminAvailability({
-          date: url.searchParams.get("date"),
-          partySize: url.searchParams.get("partySize"),
-          tableType: url.searchParams.get("tableType"),
-          time: url.searchParams.get("time"),
-        });
-        return sendJson(response, 200, payload);
-      }
-
-      if (url.pathname === "/api/admin/availability-settings" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.getAvailabilitySettings());
-      }
-
-      if (url.pathname === "/api/admin/availability-settings" && (request.method === "PATCH" || request.method === "PUT")) {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.updateAvailabilitySettings(await readJsonBody(request)));
-      }
-
-      if (url.pathname === "/api/admin/availability-settings/history" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.getAvailabilitySettingsHistory());
-      }
-
-      if (url.pathname === "/api/admin/availability-events" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.listAvailabilityEvents());
-      }
-
-      if (url.pathname === "/api/admin/availability-events" && request.method === "POST") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 201, await system.createAvailabilityEvent(await readJsonBody(request)));
-      }
-
-      const availabilityEventMatch = url.pathname.match(/^\/api\/admin\/availability-events\/([^/]+)$/);
-      if (availabilityEventMatch && (request.method === "PATCH" || request.method === "PUT")) {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.updateAvailabilityEvent(decodeURIComponent(availabilityEventMatch[1]), await readJsonBody(request)));
-      }
-
-      if (availabilityEventMatch && request.method === "DELETE") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.deleteAvailabilityEvent(decodeURIComponent(availabilityEventMatch[1])));
-      }
-
-      if (url.pathname === "/api/admin/services" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        return sendJson(response, 200, await system.listServices());
-      }
-
-      const serviceMatch = url.pathname.match(/^\/api\/admin\/services\/([^/]+)$/);
-      if (serviceMatch && (request.method === "PATCH" || request.method === "PUT")) {
-        assertAdminAuthorized(request, requiredAdminToken);
-        const payload = await system.updateService(decodeURIComponent(serviceMatch[1]), await readJsonBody(request));
-        return sendJson(response, 200, payload);
-      }
-
-      if (url.pathname === "/api/admin/blocked-time-slots" && request.method === "GET") {
-        assertAdminAuthorized(request, requiredAdminToken);
-        const payload = await system.listBlockedTimeSlots({
-          date: url.searchParams.get("date"),
-        });
-        return sendJson(response, 200, payload);
-      }
-
-      if (url.pathname === "/api/admin/blocked-time-slots" && request.method === "POST") {
+      const driverMatch = url.pathname.match(/^\/api\/admin\/drivers\/([^/]+)$/);
+      if (driverMatch && request.method === "PATCH") {
         assertAdminAuthorized(request, requiredAdminToken);
         const body = await readJsonBody(request);
-        const payload = await system.blockTimeSlot(body);
-        return sendJson(response, 201, payload);
+        return sendJson(response, 200, { driver: drivers.update(decodeURIComponent(driverMatch[1]), body) });
+      }
+      if (driverMatch && request.method === "DELETE") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { driver: drivers.archive(decodeURIComponent(driverMatch[1])) });
       }
 
-      const blockedTimeSlotMatch = url.pathname.match(/^\/api\/admin\/blocked-time-slots\/([^/]+)$/);
-      if (blockedTimeSlotMatch && request.method === "DELETE") {
+      const driverPinMatch = url.pathname.match(/^\/api\/admin\/drivers\/([^/]+)\/pin$/);
+      if (driverPinMatch && request.method === "POST") {
         assertAdminAuthorized(request, requiredAdminToken);
-        const payload = await system.unblockTimeSlot(decodeURIComponent(blockedTimeSlotMatch[1]));
-        return sendJson(response, 200, payload);
+        const body = await readJsonBody(request);
+        drivers.resetPin(decodeURIComponent(driverPinMatch[1]), body.pin);
+        return sendJson(response, 200, { reset: true });
+      }
+
+      const orderAssignMatch = url.pathname.match(/^\/api\/admin\/orders\/([^/]+)\/assign-driver$/);
+      if (orderAssignMatch && request.method === "PATCH") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        const body = await readJsonBody(request);
+        if (body.driverId === null || body.driverId === "") {
+          return sendJson(response, 200, drivers.unassignOrder(decodeURIComponent(orderAssignMatch[1])));
+        }
+        return sendJson(response, 200, drivers.assignOrder(decodeURIComponent(orderAssignMatch[1]), body.driverId));
+      }
+
+      // ═══ LIVREURS — Auth & espace livreur ═══
+      if (url.pathname === "/api/driver/login" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        const { sessionId, driver } = drivers.loginWithPin(body, {
+          userAgent: request.headers["user-agent"] || "",
+        });
+        return sendJson(response, 200, { driver }, {
+          "Set-Cookie": buildDriverSessionCookie(sessionId, request),
+        });
+      }
+
+      if (url.pathname === "/api/driver/logout" && request.method === "POST") {
+        drivers.destroySession(request);
+        return sendJson(response, 200, { loggedOut: true }, {
+          "Set-Cookie": buildDriverSessionCookie("", request, 0),
+        });
+      }
+
+      if (url.pathname === "/api/driver/me" && request.method === "GET") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, { driver: session.driver });
+      }
+
+      if (url.pathname === "/api/driver/status" && request.method === "PATCH") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        const body = await readJsonBody(request);
+        return sendJson(response, 200, { driver: drivers.updateOwnStatus(session.driver.id, body.status) });
+      }
+
+      if (url.pathname === "/api/driver/orders" && request.method === "GET") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, {
+          orders: drivers.listActiveOrders(session.driver.id),
+          history: drivers.listHistory(session.driver.id),
+          stats: drivers.getStats(session.driver.id),
+        });
+      }
+
+      // Pool des courses dispo (visible par tous les livreurs connectes).
+      if (url.pathname === "/api/driver/pool" && request.method === "GET") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, { pool: drivers.listPool() });
+      }
+
+      // Prendre atomiquement une course du pool.
+      const driverTakeMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/take$/);
+      if (driverTakeMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, drivers.takeOrder(session.driver.id, decodeURIComponent(driverTakeMatch[1])));
+      }
+
+      // Relâcher une course (retour au pool).
+      const driverReleaseMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/release$/);
+      if (driverReleaseMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, drivers.releaseOrder(session.driver.id, decodeURIComponent(driverReleaseMatch[1])));
+      }
+
+      // Annuler une course (client injoignable, mauvaise adresse, refus).
+      const driverCancelMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/cancel$/);
+      if (driverCancelMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        const body = await readJsonBody(request);
+        return sendJson(response, 200, drivers.markCancelledByDriver(session.driver.id, decodeURIComponent(driverCancelMatch[1]), body.reason));
+      }
+
+      const driverOrderStartMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/start$/);
+      if (driverOrderStartMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, drivers.markInTransit(session.driver.id, decodeURIComponent(driverOrderStartMatch[1])));
+      }
+
+      const driverOrderDeliverMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/delivered$/);
+      if (driverOrderDeliverMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        return sendJson(response, 200, drivers.markDelivered(session.driver.id, decodeURIComponent(driverOrderDeliverMatch[1])));
+      }
+
+      if (url.pathname === "/api/driver/push/subscribe" && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        const body = await readJsonBody(request);
+        drivers.savePushSubscription(session.driver.id, body);
+        return sendJson(response, 200, { subscribed: true });
       }
 
       if (url.pathname.startsWith("/api/")) {
@@ -481,7 +494,7 @@ export function createApp({
 
       return serveStatic(url.pathname, request.method, response);
     } catch (error) {
-      if (error instanceof ReservationError || error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError) {
+      if (error instanceof ReservationError || error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
         return sendJson(response, error.status, {
           error: {
             code: error.code,

@@ -260,65 +260,9 @@ test("customer auth rejects an expired or too-weak password reset", async () => 
 });
 
 
-test("authenticated reservations are linked and available through the account endpoint", async (t) => {
-  const store = new SqliteReservationStore();
-  const sentEmails = [];
-  const auth = makeAuth(store, sentEmails);
-  const system = new ReservationSystem({ store, now: () => new Date(fixedDate) });
-  const server = createApp({ system, customerAuth: auth, corsAllowedOrigin: "https://galatee.example" });
-  await new Promise((resolve) => server.listen(0, resolve));
-  t.after(() => server.close());
-  t.after(() => store.close());
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+// Le test end-to-end reservations lie au compte a ete retire :
+// le systeme de reservation n existe plus cote API publique.
 
-  const codeResponse = await fetch(`${baseUrl}/api/auth/request-code`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: "https://galatee.example" },
-    body: JSON.stringify({
-      mode: "signup",
-      email: "lina@example.com",
-      firstName: "Lina",
-      lastName: "Martin",
-      phone: "+213555123456",
-    }),
-  });
-  assert.equal(codeResponse.status, 202);
-  const verifyResponse = await fetch(`${baseUrl}/api/auth/verify-code`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: "https://galatee.example" },
-    body: JSON.stringify({ email: "lina@example.com", code: sentEmails[0].code }),
-  });
-  assert.equal(verifyResponse.status, 200);
-  const cookie = cookieFrom(verifyResponse);
-  assert.match(cookie, /^galatee_customer_session=/);
-  assert.equal(verifyResponse.headers.get("access-control-allow-credentials"), "true");
-
-  const reservationResponse = await fetch(`${baseUrl}/api/reservations`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Cookie: cookie,
-      Origin: "https://galatee.example",
-    },
-    body: JSON.stringify({
-      date: "2026-09-02",
-      time: "19:00",
-      partySize: 2,
-      tableType: "normal",
-      specialRequest: "Chaise haute",
-    }),
-  });
-  assert.equal(reservationResponse.status, 201);
-  const reservation = (await reservationResponse.json()).reservation;
-  assert.ok(reservation.customerId);
-  assert.equal(reservation.firstName, "Lina");
-
-  const accountReservations = await fetch(`${baseUrl}/api/account/reservations`, {
-    headers: { Cookie: cookie, Origin: "https://galatee.example" },
-  });
-  assert.equal(accountReservations.status, 200);
-  assert.equal((await accountReservations.json()).reservations[0].id, reservation.id);
-});
 
 test("HTTP password reset flow issues a new session and invalidates the old password", async (t) => {
   const store = new SqliteReservationStore();

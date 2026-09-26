@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 // Une commande compte pour la fidelite des qu elle est confirmee par le
 // restaurant (le client sait qu il progresse sans attendre la livraison).
 // On exclut uniquement pending (pas encore confirme) et cancelled.
-const QUALIFYING_STATUSES = ["confirmed", "preparing", "ready", "delivered", "withdrawn", "completed"];
+const QUALIFYING_STATUSES = ["confirmed", "ready", "delivered"];
 const REWARD_TYPES = new Set(["percentage", "fixed"]);
 const DEFAULT_SETTINGS = {
   id: "default",
@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   title: "Récompense Pasta Lover",
   description: "Une remise sur votre prochaine commande.",
   active: true,
+  rewardExpirationDays: 90, // 0 = jamais
 };
 
 export class LoyaltyError extends Error {
@@ -66,11 +67,17 @@ export class LoyaltySystem {
         ON loyalty_rewards (customer_id, status, created_at);
     `);
 
-    // Migration : ajoute la colonne eligible_dish_ids si elle n existe pas
-    // deja (JSON serialise ; vide/null = la remise s applique a tous les plats).
-    const columns = this.db.prepare("PRAGMA table_info(loyalty_settings)").all();
-    if (!columns.some((column) => column.name === "eligible_dish_ids")) {
+    // Migrations : ajoute les colonnes manquantes sur les bases existantes.
+    const settingsColumns = this.db.prepare("PRAGMA table_info(loyalty_settings)").all();
+    if (!settingsColumns.some((column) => column.name === "eligible_dish_ids")) {
       this.db.exec("ALTER TABLE loyalty_settings ADD COLUMN eligible_dish_ids TEXT");
+    }
+    if (!settingsColumns.some((column) => column.name === "reward_expiration_days")) {
+      this.db.exec("ALTER TABLE loyalty_settings ADD COLUMN reward_expiration_days INTEGER NOT NULL DEFAULT 90");
+    }
+    const rewardsColumns = this.db.prepare("PRAGMA table_info(loyalty_rewards)").all();
+    if (!rewardsColumns.some((column) => column.name === "expires_at")) {
+      this.db.exec("ALTER TABLE loyalty_rewards ADD COLUMN expires_at TEXT");
     }
   }
 
@@ -78,14 +85,15 @@ export class LoyaltySystem {
     const timestamp = this.now().toISOString();
     this.db.prepare(`
       INSERT OR IGNORE INTO loyalty_settings
-        (id, qualifying_order_threshold, reward_type, reward_value, title, description, active, created_at, updated_at)
-      VALUES ('default', ?, ?, ?, ?, ?, 1, ?, ?)
+        (id, qualifying_order_threshold, reward_type, reward_value, title, description, active, reward_expiration_days, created_at, updated_at)
+      VALUES ('default', ?, ?, ?, ?, ?, 1, ?, ?, ?)
     `).run(
       DEFAULT_SETTINGS.threshold,
       DEFAULT_SETTINGS.rewardType,
       DEFAULT_SETTINGS.rewardValue,
       DEFAULT_SETTINGS.title,
       DEFAULT_SETTINGS.description,
+      DEFAULT_SETTINGS.rewardExpirationDays,
       timestamp,
       timestamp,
     );
@@ -103,7 +111,8 @@ export class LoyaltySystem {
     this.db.prepare(`
       UPDATE loyalty_settings
       SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?,
-          title = ?, description = ?, active = ?, eligible_dish_ids = ?, updated_at = ?
+          title = ?, description = ?, active = ?, eligible_dish_ids = ?,
+          reward_expiration_days = ?, updated_at = ?
       WHERE id = 'default'
     `).run(
       settings.threshold,
@@ -113,22 +122,54 @@ export class LoyaltySystem {
       settings.description,
       settings.active ? 1 : 0,
       settings.eligibleDishIds.length ? JSON.stringify(settings.eligibleDishIds) : null,
+      settings.rewardExpirationDays,
       timestamp,
     );
     return this.getSettings();
   }
 
+  // Verifie et met a jour l etat des rewards du client :
+  //  - marque comme "expired" celles dont expires_at est passe
+  //  - revoque celles dont le milestone n est plus atteint (commande annulee
+  //    apres coup fait redescendre le compteur)
+  //  - cree les nouvelles rewards pour chaque nouveau palier franchi
   syncCustomerRewards(customerId) {
     const progress = this.getCustomerProgress(customerId, { sync: false });
     if (!progress.settings.active) return progress;
 
+    const nowIso = this.now().toISOString();
+
+    // 1) Expiration temporelle
+    this.db.prepare(`
+      UPDATE loyalty_rewards
+      SET status = 'expired'
+      WHERE customer_id = ? AND status = 'available'
+        AND expires_at IS NOT NULL AND expires_at < ?
+    `).run(customerId, nowIso);
+
+    // 2) Revocation si le palier n est plus atteint (commande annulee posteriori)
+    this.db.prepare(`
+      UPDATE loyalty_rewards
+      SET status = 'expired'
+      WHERE customer_id = ? AND status = 'available'
+        AND qualifying_order_count > ?
+    `).run(customerId, progress.qualifyingOrders);
+
+    // 3) Creation des nouvelles rewards pour chaque palier atteint
     const insert = this.db.prepare(`
       INSERT OR IGNORE INTO loyalty_rewards
-        (id, customer_id, qualifying_order_count, reward_type, reward_value, title, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'available', ?)
+        (id, customer_id, qualifying_order_count, reward_type, reward_value, title, status, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'available', ?, ?)
     `);
-    const timestamp = this.now().toISOString();
-    for (let milestone = progress.settings.threshold; milestone <= progress.qualifyingOrders; milestone += progress.settings.threshold) {
+    const expirationDays = progress.settings.rewardExpirationDays;
+    const expiresAt = expirationDays > 0
+      ? new Date(this.now().getTime() + expirationDays * 86400000).toISOString()
+      : null;
+    for (
+      let milestone = progress.settings.threshold;
+      milestone <= progress.qualifyingOrders;
+      milestone += progress.settings.threshold
+    ) {
       insert.run(
         randomUUID(),
         customerId,
@@ -136,7 +177,8 @@ export class LoyaltySystem {
         progress.settings.rewardType,
         progress.settings.rewardValue,
         progress.settings.title,
-        timestamp,
+        nowIso,
+        expiresAt,
       );
     }
     return this.getCustomerProgress(customerId, { sync: false });
@@ -153,12 +195,17 @@ export class LoyaltySystem {
 
     if (sync && settings.active) return this.syncCustomerRewards(customerId);
 
+    // Defense en profondeur : meme sans sync, on filtre les rewards expirees
+    // ou dont le palier n est plus atteint pour eviter d en presenter une invalide.
+    const nowIso = this.now().toISOString();
     const availableReward = this.db.prepare(`
-      SELECT id, qualifying_order_count, reward_type, reward_value, title, status, created_at
+      SELECT id, qualifying_order_count, reward_type, reward_value, title, status, created_at, expires_at
       FROM loyalty_rewards
       WHERE customer_id = ? AND status = 'available'
+        AND (expires_at IS NULL OR expires_at > ?)
+        AND qualifying_order_count <= ?
       ORDER BY qualifying_order_count ASC LIMIT 1
-    `).get(customerId);
+    `).get(customerId, nowIso, qualifyingOrders);
     const progressInCycle = qualifyingOrders % settings.threshold;
     const ordersToNextReward = progressInCycle === 0 ? settings.threshold : settings.threshold - progressInCycle;
     return {
@@ -179,11 +226,14 @@ export class LoyaltySystem {
     if (!Number.isInteger(subtotal) || subtotal < 0) {
       throw new LoyaltyError("LOYALTY_SUBTOTAL_INVALID", "The order subtotal is invalid.", 422);
     }
+    const nowIso = this.now().toISOString();
+    // On refuse une reward expiree ou dont le palier n est plus atteint.
     const row = this.db.prepare(`
-      SELECT id, customer_id, reward_type, reward_value, title
+      SELECT id, customer_id, reward_type, reward_value, title, qualifying_order_count, expires_at
       FROM loyalty_rewards
       WHERE id = ? AND customer_id = ? AND status = 'available'
-    `).get(rewardId, customerId);
+        AND (expires_at IS NULL OR expires_at > ?)
+    `).get(rewardId, customerId, nowIso);
     if (!row) return null;
 
     const settings = this.getSettings();
@@ -204,6 +254,7 @@ export class LoyaltySystem {
       discountCents,
       eligibleAmountCents: eligibleAmount,
       appliesToAllDishes: eligibleIds.length === 0,
+      expiresAt: row.expires_at,
     };
   }
 
@@ -270,6 +321,16 @@ function normalizeSettings(input) {
         .map((id) => id.trim())
         .slice(0, 100)
     : [];
+  const rawExpiration = input.rewardExpirationDays;
+  const rewardExpirationDays = rawExpiration === undefined || rawExpiration === null || rawExpiration === ""
+    ? DEFAULT_SETTINGS.rewardExpirationDays
+    : Number(rawExpiration);
+  if (!Number.isInteger(rewardExpirationDays) || rewardExpirationDays < 0 || rewardExpirationDays > 3650) {
+    throw new LoyaltyError(
+      "LOYALTY_EXPIRATION_INVALID",
+      "Reward expiration must be between 0 (never) and 3650 days.",
+    );
+  }
   return {
     threshold,
     rewardType,
@@ -278,6 +339,7 @@ function normalizeSettings(input) {
     description,
     active: input.active !== false && Number(input.active) !== 0,
     eligibleDishIds,
+    rewardExpirationDays,
   };
 }
 
@@ -305,6 +367,7 @@ function mapSettingsRow(row) {
     description: row.description,
     active: Boolean(row.active),
     eligibleDishIds,
+    rewardExpirationDays: row.reward_expiration_days ?? DEFAULT_SETTINGS.rewardExpirationDays,
     updatedAt: row.updated_at,
   };
 }
@@ -318,5 +381,6 @@ function mapRewardRow(row) {
     title: row.title,
     status: row.status,
     createdAt: row.created_at,
+    expiresAt: row.expires_at || null,
   };
 }

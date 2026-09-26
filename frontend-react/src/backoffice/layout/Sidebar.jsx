@@ -1,4 +1,4 @@
-import { LayoutGrid, LineChart, ExternalLink, Gift, ShoppingBag, UsersRound, Truck } from "lucide-react";
+import { LayoutGrid, LineChart, ExternalLink, Gift, ShoppingBag, UsersRound, Truck, Bike } from "lucide-react";
 
 const NAV_SECTIONS = [
   {
@@ -7,6 +7,7 @@ const NAV_SECTIONS = [
       { key: "orders", label: "Commandes", Icon: ShoppingBag, kbd: "G O" },
       { key: "menu", label: "Menu", Icon: LayoutGrid, kbd: "G M" },
       { key: "delivery", label: "Livraison", Icon: Truck, kbd: "G D" },
+      { key: "drivers", label: "Livreurs", Icon: Bike, kbd: "G L" },
     ],
   },
   {

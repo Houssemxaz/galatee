@@ -16,6 +16,7 @@ import AccountPage from "@/pages/AccountPage";
 import OrdersHistoryPage from "@/pages/OrdersHistoryPage";
 import PastaLoverClubPage from "@/pages/PastaLoverClubPage";
 import TableEntryPage from "@/pages/TableEntryPage";
+import DriverApp from "@/driver/DriverApp";
 import { CustomerAuthProvider } from "@/context/CustomerAuthContext";
 import { TableModeProvider } from "@/context/TableModeContext";
 import { ToastProvider } from "@/context/ToastContext";
@@ -29,7 +30,9 @@ function PageViewTracker() {
   return null;
 }
 
-export default function App() {
+// L espace livreur (/livreur/*) est une PWA autonome sans chrome du site public
+// (pas de header, footer, cart context...). On l isole au niveau top-level.
+function ClientSite() {
   return (
     <CustomerAuthProvider>
       <CartProvider>
@@ -67,5 +70,14 @@ export default function App() {
       </CheckoutFormProvider>
       </CartProvider>
     </CustomerAuthProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/livreur/*" element={<DriverApp />} />
+      <Route path="/*" element={<ClientSite />} />
+    </Routes>
   );
 }

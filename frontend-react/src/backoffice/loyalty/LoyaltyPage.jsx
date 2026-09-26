@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   description: "Une remise sur votre prochaine commande.",
   active: true,
   eligibleDishIds: [],
+  rewardExpirationDays: 90,
 };
 
 function rewardLabel(settings) {
@@ -91,6 +92,7 @@ export default function LoyaltyPage() {
           ...settings,
           threshold: Number(settings.threshold),
           rewardValue: Number(settings.rewardValue),
+          rewardExpirationDays: Number(settings.rewardExpirationDays ?? 90),
           eligibleDishIds: settings.eligibleDishIds || [],
         }),
       });
@@ -177,6 +179,17 @@ export default function LoyaltyPage() {
                   value={settings.title}
                   maxLength={120}
                   onChange={(event) => change("title", event.target.value)}
+                />
+              </label>
+              <label>
+                Expiration (jours)
+                <input
+                  type="number"
+                  min="0"
+                  max="3650"
+                  value={settings.rewardExpirationDays ?? 90}
+                  onChange={(event) => change("rewardExpirationDays", event.target.value)}
+                  title="Nombre de jours avant qu'une récompense non utilisée expire. 0 = jamais."
                 />
               </label>
               <label className="bo-loyalty-field-wide">

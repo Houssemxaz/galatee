@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Check, MapPin, Store, Truck } from "lucide-react";
+
+// Chargement paresseux : Leaflet + tuiles OSM = ~150 kB, non necessaire hors delivery.
+const DeliveryLocationPicker = lazy(() => import("@/components/DeliveryLocationPicker"));
 import { Link, useNavigate } from "react-router-dom";
 import Reveal from "@/components/Reveal";
 import ShineCTA from "@/components/ShineCTA";
@@ -210,6 +213,13 @@ export default function CheckoutContactPage() {
                     <span>Adresse de livraison</span>
                     <textarea rows={3} value={form.deliveryAddress} onChange={(e) => updateForm("deliveryAddress", e.target.value)} required placeholder="Rue, immeuble, étage, digicode…" />
                   </label>
+                  <Suspense fallback={<p className="pbg-map-picker-loading">Chargement de la carte…</p>}>
+                    <DeliveryLocationPicker
+                      latitude={form.deliveryLatitude}
+                      longitude={form.deliveryLongitude}
+                      onChange={({ latitude, longitude }) => mergeForm({ deliveryLatitude: latitude, deliveryLongitude: longitude })}
+                    />
+                  </Suspense>
                 </>
               )}
 

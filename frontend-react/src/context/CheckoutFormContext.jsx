@@ -10,6 +10,8 @@ const EMPTY_FORM = {
   deliveryMode: "delivery",
   communeId: "",
   deliveryAddress: "",
+  deliveryLatitude: null,
+  deliveryLongitude: null,
   note: "",
   loyaltyRewardId: "",
 };

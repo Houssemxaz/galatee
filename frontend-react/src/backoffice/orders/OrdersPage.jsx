@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, UserX, X } from "lucide-react";
+import { ArrowUpRight, Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, UserX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
 import { Slideover, EmptyState, SkeletonRows } from "../shared/primitives.jsx";
+import { hasPreciseLocation, orderMapsHref } from "@/lib/maps";
 
 const STATUS_META = {
   pending: ["En attente", "warn"],
@@ -400,6 +401,19 @@ export default function OrdersPage() {
                 ? `${expanded.deliveryAddress}, ${expanded.communeName}`
                 : "Retrait chez Galatée"}
             </p>
+            {expanded.deliveryMode === "delivery" && (
+              <p style={{ marginTop: 4 }}>
+                <a
+                  href={orderMapsHref(expanded)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--bo-accent, currentColor)" }}
+                >
+                  <span>{hasPreciseLocation(expanded) ? "Ouvrir la navigation Google Maps (point exact)" : "Ouvrir la recherche Google Maps"}</span>
+                  <ArrowUpRight size={11} strokeWidth={2} />
+                </a>
+              </p>
+            )}
             <p style={{ color: "var(--bo-ink-muted)", fontSize: 12 }}>
               Paiement à la {expanded.deliveryMode === "delivery" ? "livraison" : "récupération"}
             </p>

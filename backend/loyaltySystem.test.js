@@ -36,10 +36,8 @@ function orderBody(itemId) {
 
 function completeOrder(orders, orderId) {
   orders.updateStatus(orderId, "confirmed");
-  orders.updateStatus(orderId, "preparing");
   orders.updateStatus(orderId, "ready");
-  orders.updateStatus(orderId, "withdrawn");
-  return orders.updateStatus(orderId, "completed");
+  return orders.updateStatus(orderId, "delivered");
 }
 
 test("counts completed purchases and creates one reward at the configured threshold", (t) => {

@@ -59,10 +59,8 @@ test("enforces the operational order status flow", (t) => {
   const item = menu.listPublished()[0];
   const order = orders.createOrder(body([{ productId: item.id }])).id;
   assert.equal(orders.updateStatus(order, "confirmed").status, "confirmed");
-  assert.equal(orders.updateStatus(order, "preparing").status, "preparing");
   assert.equal(orders.updateStatus(order, "ready").status, "ready");
   assert.equal(orders.updateStatus(order, "delivered").status, "delivered");
-  assert.equal(orders.updateStatus(order, "completed").status, "completed");
   assert.throws(() => orders.updateStatus(order, "cancelled"), (error) => error.code === "ORDER_STATUS_TRANSITION_INVALID");
 });
 

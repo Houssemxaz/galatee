@@ -130,6 +130,14 @@ export class OrderSystem {
     if (!orderColumns.some((column) => column.name === "delivered_at")) {
       this.db.exec("ALTER TABLE orders ADD COLUMN delivered_at TEXT");
     }
+    // Localisation precise choisie par le client sur une carte au checkout.
+    // Nullables : le champ reste optionnel et l'adresse texte demeure obligatoire.
+    if (!orderColumns.some((column) => column.name === "delivery_latitude")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN delivery_latitude REAL");
+    }
+    if (!orderColumns.some((column) => column.name === "delivery_longitude")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN delivery_longitude REAL");
+    }
     // Migration statuts : simplification a 4 statuts + cancelled.
     // 'preparing' devient 'confirmed' (accepte mais pas encore pret).
     // 'withdrawn' et 'completed' deviennent 'delivered'.
@@ -236,13 +244,13 @@ export class OrderSystem {
       this.db.prepare(`
         INSERT INTO orders (
           id, order_number, customer_id, first_name, last_name, phone, email,
-          delivery_mode, commune_id, commune_name, delivery_address, payment_method,
+          delivery_mode, commune_id, commune_name, delivery_address, delivery_latitude, delivery_longitude, payment_method,
           status, note, subtotal_cents, delivery_fee_cents, discount_cents, loyalty_reward_id, total_cents, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         order.id, order.orderNumber, order.customerId, order.firstName, order.lastName,
         order.phone, order.email, order.deliveryMode, order.communeId, order.communeName,
-        order.deliveryAddress, order.paymentMethod, order.status, order.note,
+        order.deliveryAddress, order.deliveryLatitude, order.deliveryLongitude, order.paymentMethod, order.status, order.note,
         order.subtotalCents, order.deliveryFeeCents, order.discountCents, order.loyaltyRewardId,
         order.totalCents, order.createdAt, order.updatedAt,
       );
@@ -400,6 +408,8 @@ export class OrderSystem {
       communeId: row.commune_id,
       communeName: row.commune_name,
       deliveryAddress: row.delivery_address,
+      deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
+      deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
       paymentMethod: row.payment_method,
       status: row.status,
       note: row.note,
@@ -441,7 +451,40 @@ function normalizeOrderInput(input) {
   if (items.length > MAX_ITEMS) throw new OrderError("ORDER_ITEMS_TOO_MANY", "An order cannot contain more than 50 lines.");
   const note = normalizeOptionalText(input.note, 500);
   const loyaltyRewardId = normalizeOptionalText(input.loyaltyRewardId, 120);
-  return { firstName, lastName, phone, email, deliveryMode, communeId: deliveryMode === "delivery" ? communeId : null, deliveryAddress: deliveryMode === "delivery" ? deliveryAddress : "", items, note, loyaltyRewardId };
+  const { deliveryLatitude, deliveryLongitude } = normalizeDeliveryCoordinates(input, deliveryMode);
+  return {
+    firstName, lastName, phone, email, deliveryMode,
+    communeId: deliveryMode === "delivery" ? communeId : null,
+    deliveryAddress: deliveryMode === "delivery" ? deliveryAddress : "",
+    deliveryLatitude, deliveryLongitude,
+    items, note, loyaltyRewardId,
+  };
+}
+
+// Bounding box large autour du grand Alger. Rejette silencieusement toute coordonnee
+// hors zone ou non finie plutot que de bloquer la commande : le champ reste optionnel
+// et l adresse texte demeure la source de verite obligatoire.
+const ALGIERS_LAT_MIN = 36.4;
+const ALGIERS_LAT_MAX = 37.0;
+const ALGIERS_LNG_MIN = 2.5;
+const ALGIERS_LNG_MAX = 3.6;
+
+function normalizeDeliveryCoordinates(input, deliveryMode) {
+  if (deliveryMode !== "delivery") return { deliveryLatitude: null, deliveryLongitude: null };
+  const lat = input.deliveryLatitude;
+  const lng = input.deliveryLongitude;
+  if (lat === undefined || lat === null || lat === "" || lng === undefined || lng === null || lng === "") {
+    return { deliveryLatitude: null, deliveryLongitude: null };
+  }
+  const latNum = Number(lat);
+  const lngNum = Number(lng);
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+    throw new OrderError("DELIVERY_COORDINATES_INVALID", "Delivery coordinates must be finite numbers.");
+  }
+  if (latNum < ALGIERS_LAT_MIN || latNum > ALGIERS_LAT_MAX || lngNum < ALGIERS_LNG_MIN || lngNum > ALGIERS_LNG_MAX) {
+    throw new OrderError("DELIVERY_COORDINATES_OUT_OF_RANGE", "Delivery coordinates are outside the Algiers area.");
+  }
+  return { deliveryLatitude: latNum, deliveryLongitude: lngNum };
 }
 
 function normalizeCommune(input) {

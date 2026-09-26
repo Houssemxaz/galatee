@@ -1,0 +1,115 @@
+.pbg-map-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pbg-map-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pbg-map-picker-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pbg-map-picker-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--charcoal, #2a2a2a);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+}
+
+.pbg-map-picker-title small {
+  font-weight: 400;
+  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 55%, transparent);
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+.pbg-map-picker-hint {
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 65%, transparent);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pbg-map-picker-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pbg-map-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--charcoal, #2a2a2a) 15%, transparent);
+  background: var(--paper, #fbf7ef);
+  color: var(--charcoal, #2a2a2a);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.pbg-map-picker-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--charcoal, #2a2a2a) 6%, var(--paper, #fbf7ef));
+}
+
+.pbg-map-picker-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pbg-map-picker-btn-ghost {
+  background: transparent;
+}
+
+.pbg-map-picker-canvas {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--charcoal, #2a2a2a) 12%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.pbg-map-picker-coords {
+  font-size: 0.78rem;
+  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 70%, transparent);
+  margin: 0;
+}
+
+.pbg-map-picker-coords b {
+  color: var(--charcoal, #2a2a2a);
+  font-variant-numeric: tabular-nums;
+}
+
+.pbg-map-picker-coords-muted {
+  font-style: italic;
+}
+
+.pbg-map-picker-error {
+  font-size: 0.75rem;
+  color: var(--accent, #c94a3a);
+  margin: 0;
+}
+
+.pbg-map-picker-loading {
+  padding: 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--charcoal, #2a2a2a) 4%, var(--paper, #fbf7ef));
+  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 60%, transparent);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}

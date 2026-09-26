@@ -29,8 +29,14 @@ function formatDzd(cents) {
   return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
 }
 
-function mapsHref(address, commune) {
-  const query = encodeURIComponent(`${address}, ${commune}, Alger, Algérie`);
+function mapsHref(order) {
+  // Si le client a place un point precis sur la carte au checkout, on ouvre Google Maps
+  // en mode navigation directe vers ces coordonnees (aucune cle API requise).
+  if (Number.isFinite(order?.deliveryLatitude) && Number.isFinite(order?.deliveryLongitude)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${order.deliveryLatitude},${order.deliveryLongitude}`;
+  }
+  // Fallback pour les anciennes commandes sans coordonnees : recherche textuelle.
+  const query = encodeURIComponent(`${order?.deliveryAddress || ""}, ${order?.communeName || ""}, Alger, Algérie`);
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
@@ -352,7 +358,7 @@ function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
       </header>
       <p className="pbg-drv-customer">{order.firstName} {order.lastName}</p>
       <div className="pbg-drv-card-links">
-        <a href={mapsHref(order.deliveryAddress, order.communeName)} target="_blank" rel="noopener noreferrer" className="pbg-drv-link-chip">
+        <a href={mapsHref(order)} target="_blank" rel="noopener noreferrer" className="pbg-drv-link-chip">
           <MapPin size={13} strokeWidth={2} />
           <span>{order.deliveryAddress}, {order.communeName}</span>
           <ArrowUpRight size={11} strokeWidth={2} />

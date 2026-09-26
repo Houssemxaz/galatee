@@ -64,6 +64,41 @@ test("enforces the operational order status flow", (t) => {
   assert.throws(() => orders.updateStatus(order, "cancelled"), (error) => error.code === "ORDER_STATUS_TRANSITION_INVALID");
 });
 
+test("stores and returns optional delivery coordinates for delivery orders", (t) => {
+  const { menu, orders } = createSystems(t);
+  const item = menu.listPublished()[0];
+
+  // Coordonnees valides (Hydra ~ 36.750, 3.045)
+  const delivery = orders.createOrder(body([{ productId: item.id }], { deliveryLatitude: 36.75, deliveryLongitude: 3.045 }));
+  assert.equal(delivery.deliveryLatitude, 36.75);
+  assert.equal(delivery.deliveryLongitude, 3.045);
+
+  // Commande delivery sans coordonnees : les champs restent null (feature optionnelle).
+  const deliveryNoCoords = orders.createOrder(body([{ productId: item.id }]));
+  assert.equal(deliveryNoCoords.deliveryLatitude, null);
+  assert.equal(deliveryNoCoords.deliveryLongitude, null);
+
+  // Pickup : les coordonnees ne sont jamais persistees meme si le client en fournit.
+  const pickup = orders.createOrder(body([{ productId: item.id }], {
+    deliveryMode: "pickup", communeId: "hydra", deliveryAddress: "",
+    deliveryLatitude: 36.75, deliveryLongitude: 3.045,
+  }));
+  assert.equal(pickup.deliveryLatitude, null);
+  assert.equal(pickup.deliveryLongitude, null);
+
+  // Coordonnees hors zone Alger : rejetees.
+  assert.throws(
+    () => orders.createOrder(body([{ productId: item.id }], { deliveryLatitude: 48.85, deliveryLongitude: 2.35 })),
+    (error) => error instanceof OrderError && error.code === "DELIVERY_COORDINATES_OUT_OF_RANGE",
+  );
+
+  // Valeurs non numeriques : rejetees.
+  assert.throws(
+    () => orders.createOrder(body([{ productId: item.id }], { deliveryLatitude: "abc", deliveryLongitude: 3.045 })),
+    (error) => error instanceof OrderError && error.code === "DELIVERY_COORDINATES_INVALID",
+  );
+});
+
 test("keeps commune fees editable and can deactivate a commune", (t) => {
   const { orders } = createSystems(t);
   const updated = orders.updateCommune("hydra", { fee: 750, active: false });

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, UserX, X } from "lucide-react";
+import { ArrowUpRight, Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, UserX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
 import { Slideover, EmptyState, SkeletonRows } from "../shared/primitives.jsx";
+import { hasPreciseLocation, orderMapsHref } from "@/lib/maps";
 
 const STATUS_META = {
   pending: ["En attente", "warn"],
@@ -36,8 +37,10 @@ export default function OrdersPage() {
   const [drivers, setDrivers] = useState([]);
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const knownPendingRef = useRef(null);
   const audioRef = useRef(null);
+  // Miroir ref du state pour lecture synchrone depuis notifyNewOrders (capture par load()).
   const audioUnlockedRef = useRef(false);
 
   function ensureAudio() {
@@ -75,6 +78,7 @@ export default function OrdersPage() {
         audio.pause();
         audio.currentTime = 0;
         audioUnlockedRef.current = true;
+        setAudioUnlocked(true);
       } catch { /* autoplay peut echouer si le geste est trop indirect — on retentera au prochain clic */ }
     }
     if (typeof Notification === "undefined") return;
@@ -260,9 +264,9 @@ export default function OrdersPage() {
         <Input placeholder="N° commande, client, téléphone…" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       <Button variant="outline" size="sm" onClick={load} aria-label="Rafraîchir les commandes"><RefreshCw size={14} /></Button>
-      {notificationPermission !== "granted" && notificationPermission !== "unsupported" && (
-        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer les notifications de nouvelles commandes">
-          <Bell size={14} /> <span>Activer les alertes</span>
+      {!audioUnlocked && (
+        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer le son de nouvelle commande (et les notifications navigateur si supportees)">
+          <Bell size={14} /> <span>Activer les alertes sonores</span>
         </Button>
       )}
     </section>
@@ -397,6 +401,19 @@ export default function OrdersPage() {
                 ? `${expanded.deliveryAddress}, ${expanded.communeName}`
                 : "Retrait chez Galatée"}
             </p>
+            {expanded.deliveryMode === "delivery" && (
+              <p style={{ marginTop: 4 }}>
+                <a
+                  href={orderMapsHref(expanded)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--bo-accent, currentColor)" }}
+                >
+                  <span>{hasPreciseLocation(expanded) ? "Ouvrir la navigation Google Maps (point exact)" : "Ouvrir la recherche Google Maps"}</span>
+                  <ArrowUpRight size={11} strokeWidth={2} />
+                </a>
+              </p>
+            )}
             <p style={{ color: "var(--bo-ink-muted)", fontSize: 12 }}>
               Paiement à la {expanded.deliveryMode === "delivery" ? "livraison" : "récupération"}
             </p>

@@ -55,7 +55,7 @@ export default function MenuPage() {
         path="/menu"
         jsonLd={menuJsonLd}
       />
-      <section className="pbg-page-header">
+      <section className="pbg-page-header" data-page-number="02">
         <div className="pbg-page-shell">
           <p className="pbg-page-kicker"><span>La carte</span></p>
           <h1 className="pbg-page-title">

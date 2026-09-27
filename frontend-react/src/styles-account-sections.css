@@ -1,0 +1,500 @@
+/* ══════════════════════════════════════════════════════════════════════
+ * /COMPTE — HUB DESKTOP + SOUS-PAGES
+ * - Mobile totalement inchangé (le hub est masqué en-dessous de 1024px)
+ * - Desktop : /compte affiche 4 cards rouges vers les sous-pages
+ * - Sous-pages : /compte/{profil|fidelite|preferences} avec fond rouge
+ *   (bordeaux / tomato / ember / ink) - dans la lignée du fond des CTA
+ *   trattoria que tu aimais.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── HUB : caché en mobile, grille 2×2 en desktop ────────────────────── */
+.pbg-account-hub-section { display: none; }
+
+@media (min-width: 1024px) {
+  /* Le hub prend la place du carnet en desktop */
+  .pbg-account-hub-section {
+    display: block;
+    padding: 20px 0 clamp(48px, 6vw, 80px);
+  }
+  .pbg-account-hub-shell {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  /* En desktop, on masque le carnet mobile (déjà couvert par les 4 sous-pages) */
+  .pbg-account-body,
+  .pbg-account-page .pbg-account-body { display: none !important; }
+}
+
+.pbg-account-hub-card {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  transition: transform 380ms cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 380ms cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow: 0 6px 20px -12px rgba(20, 20, 8, 0.35);
+  will-change: transform;
+}
+.pbg-account-hub-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 30px 50px -22px rgba(122, 30, 36, 0.55),
+              0 8px 20px -12px rgba(208, 54, 43, 0.30);
+}
+.pbg-account-hub-link {
+  position: relative;
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 24px;
+  align-items: center;
+  padding: 32px 36px;
+  text-decoration: none;
+  color: inherit;
+  min-height: 200px;
+}
+.pbg-account-hub-index {
+  font-family: var(--display, "Antonio"), sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 0.9;
+  opacity: 0.55;
+  letter-spacing: -0.015em;
+}
+.pbg-account-hub-icon {
+  position: absolute;
+  top: 32px;
+  right: 36px;
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pbg-account-hub-card:hover .pbg-account-hub-icon { transform: scale(1.08) rotate(-4deg); }
+.pbg-account-hub-body { display: flex; flex-direction: column; gap: 6px; padding-right: 60px; }
+.pbg-account-hub-label {
+  margin: 0;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.pbg-account-hub-value {
+  margin: 0;
+  font-family: var(--display, "Antonio"), sans-serif;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+}
+.pbg-account-hub-note {
+  margin: 4px 0 0;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 13.5px;
+  line-height: 1.5;
+  opacity: 0.82;
+  max-width: 340px;
+}
+.pbg-account-hub-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
+              background 320ms ease;
+}
+.pbg-account-hub-card:hover .pbg-account-hub-cta {
+  background: rgba(255, 255, 255, 0.26);
+  transform: translateX(4px);
+}
+
+/* Grain 35mm par card */
+.pbg-account-hub-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch' seed='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  opacity: 0.20;
+  pointer-events: none;
+  z-index: 0;
+}
+.pbg-account-hub-card > * { position: relative; z-index: 1; }
+
+/* Variantes de fond des cards (famille rouge) */
+.pbg-account-hub-card-bordeaux {
+  background:
+    radial-gradient(70% 90% at 88% 0%, rgba(232, 166, 82, 0.20) 0%, transparent 60%),
+    radial-gradient(60% 80% at 12% 100%, rgba(208, 54, 43, 0.28) 0%, transparent 60%),
+    linear-gradient(150deg, #7A1E24 0%, #5C1519 55%, #401014 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-hub-card-tomato {
+  background:
+    radial-gradient(70% 90% at 12% 0%, rgba(232, 166, 82, 0.28) 0%, transparent 60%),
+    radial-gradient(60% 80% at 88% 100%, rgba(47, 56, 33, 0.30) 0%, transparent 60%),
+    linear-gradient(150deg, #DE4032 0%, #D0362B 50%, #A72821 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-hub-card-ember {
+  background:
+    radial-gradient(70% 90% at 88% 20%, rgba(232, 166, 82, 0.25) 0%, transparent 60%),
+    radial-gradient(60% 80% at 12% 90%, rgba(122, 30, 36, 0.35) 0%, transparent 60%),
+    linear-gradient(150deg, #B03429 0%, #8A2118 60%, #5C1519 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-hub-card-ink {
+  background:
+    radial-gradient(70% 90% at 88% 0%, rgba(208, 54, 43, 0.28) 0%, transparent 55%),
+    radial-gradient(60% 80% at 12% 100%, rgba(122, 30, 36, 0.35) 0%, transparent 55%),
+    linear-gradient(150deg, #3D0F13 0%, #29090C 60%, #170608 100%);
+  color: var(--paper, #F5EFE4);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * SOUS-PAGES /compte/*
+ * ══════════════════════════════════════════════════════════════════════ */
+.pbg-account-section { min-height: 100vh; position: relative; }
+.pbg-account-section-header {
+  padding: clamp(90px, 12vw, 140px) 0 clamp(32px, 5vw, 60px);
+  position: relative;
+  overflow: hidden;
+}
+.pbg-account-section-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  text-decoration: none;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 200ms ease, transform 200ms ease;
+  margin-bottom: 20px;
+}
+.pbg-account-section-back:hover { background: rgba(255, 255, 255, 0.22); transform: translateX(-2px); }
+.pbg-account-section-title { max-width: 720px; }
+.pbg-account-section-lede { max-width: 640px; }
+
+/* Sur toutes les sous-pages, le titre hérite de la couleur du fond */
+.pbg-account-section .pbg-page-title,
+.pbg-account-section .pbg-page-lede,
+.pbg-account-section .pbg-page-mark,
+.pbg-account-section .pbg-page-mark em {
+  color: inherit !important;
+}
+.pbg-account-section .pbg-page-mark span { color: currentColor; opacity: 0.85; }
+.pbg-account-section .pbg-page-mark i { background: currentColor; opacity: 0.5; }
+.pbg-account-section .pbg-page-title em { color: var(--gold, #E8A652) !important; }
+.pbg-account-section .pbg-page-lede { opacity: 0.85; }
+
+.pbg-account-section-body {
+  padding: clamp(24px, 4vw, 40px) 20px clamp(80px, 10vw, 120px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+/* Panneaux internes */
+.pbg-account-panel {
+  padding: clamp(24px, 4vw, 36px);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  backdrop-filter: blur(4px);
+}
+.pbg-account-panel-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.pbg-account-panel-icon {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pbg-account-panel-eyebrow {
+  margin: 0;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+.pbg-account-panel-title {
+  margin: 4px 0 0;
+  font-family: var(--display, "Antonio"), sans-serif;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+}
+.pbg-account-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pbg-account-panel-list li {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+.pbg-account-panel-list li:last-child { border-bottom: 0; }
+.pbg-account-panel-list-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+}
+.pbg-account-panel-list li small {
+  display: block;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.68;
+  margin-bottom: 2px;
+}
+.pbg-account-panel-list li strong {
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  word-break: break-word;
+}
+.pbg-account-panel-note,
+.pbg-account-panel-body {
+  margin: 0;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+.pbg-account-panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 200ms ease, transform 200ms ease;
+  align-self: flex-start;
+}
+.pbg-account-panel-link:hover { background: rgba(255, 255, 255, 0.22); transform: translateX(2px); }
+
+.pbg-account-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--gold, #E8A652);
+  color: var(--ink-deep, #1A1614);
+  border: 0;
+  cursor: pointer;
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 200ms cubic-bezier(0.32, 0.72, 0, 1),
+              box-shadow 200ms ease;
+  align-self: flex-start;
+}
+.pbg-account-logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -12px rgba(232, 166, 82, 0.45);
+}
+
+/* Loyalty panel spécifique */
+.pbg-account-loyalty-panel {
+  align-items: center;
+  text-align: center;
+  padding: clamp(32px, 5vw, 48px);
+}
+.pbg-account-loyalty-counter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--display, "Antonio"), sans-serif;
+  font-weight: 700;
+  color: var(--gold, #E8A652);
+  line-height: 1;
+}
+.pbg-account-loyalty-progress { font-size: clamp(72px, 12vw, 128px); letter-spacing: -0.03em; }
+.pbg-account-loyalty-slash { font-size: clamp(48px, 8vw, 84px); opacity: 0.5; }
+.pbg-account-loyalty-total { font-size: clamp(48px, 8vw, 84px); opacity: 0.75; }
+
+.pbg-account-loyalty-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.pbg-account-loyalty-track > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold, #E8A652), var(--paper, #F5EFE4));
+  border-radius: 999px;
+  transition: width 600ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.pbg-account-loyalty-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+}
+.pbg-account-loyalty-stamp {
+  aspect-ratio: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.35);
+  transition: all 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pbg-account-loyalty-stamp.is-filled {
+  background: var(--gold, #E8A652);
+  color: var(--ink-deep, #1A1614);
+  border-color: var(--gold, #E8A652);
+  transform: rotate(-4deg) scale(1.02);
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.32);
+}
+.pbg-account-loyalty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.pbg-account-loyalty-reward,
+.pbg-account-loyalty-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: var(--body, "DM Sans"), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  max-width: 460px;
+  text-align: left;
+}
+.pbg-account-loyalty-reward {
+  background: var(--gold, #E8A652);
+  color: var(--ink-deep, #1A1614);
+  font-weight: 600;
+}
+
+/* Watermark chiffre géant */
+.pbg-account-section-header::after {
+  content: attr(data-page-number);
+  position: absolute;
+  right: -20px;
+  bottom: -100px;
+  font-family: var(--display, "Antonio"), sans-serif;
+  font-size: clamp(240px, 32vw, 480px);
+  font-weight: 700;
+  line-height: 0.8;
+  color: rgba(255, 255, 255, 0.06);
+  letter-spacing: -0.05em;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+.pbg-account-section-header > * { position: relative; z-index: 1; }
+
+/* Grain fixe sur la sous-page */
+.pbg-account-section::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch' seed='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  opacity: 0.16;
+  pointer-events: none;
+  z-index: 0;
+}
+.pbg-account-section > * { position: relative; z-index: 1; }
+
+/* Backgrounds par variante */
+.pbg-account-section-bordeaux {
+  background:
+    radial-gradient(60% 55% at 12% 12%, rgba(232, 166, 82, 0.20) 0%, transparent 55%),
+    radial-gradient(55% 60% at 90% 82%, rgba(208, 54, 43, 0.28) 0%, transparent 55%),
+    linear-gradient(160deg, #7A1E24 0%, #5C1519 55%, #401014 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-section-tomato {
+  background:
+    radial-gradient(60% 55% at 15% 12%, rgba(232, 166, 82, 0.28) 0%, transparent 55%),
+    radial-gradient(55% 60% at 88% 82%, rgba(47, 56, 33, 0.30) 0%, transparent 55%),
+    linear-gradient(160deg, #DE4032 0%, #D0362B 50%, #A72821 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-section-ember {
+  background:
+    radial-gradient(60% 55% at 88% 20%, rgba(232, 166, 82, 0.24) 0%, transparent 55%),
+    radial-gradient(55% 60% at 12% 90%, rgba(122, 30, 36, 0.35) 0%, transparent 55%),
+    linear-gradient(160deg, #B03429 0%, #8A2118 60%, #5C1519 100%);
+  color: var(--paper, #F5EFE4);
+}
+.pbg-account-section-ink {
+  background:
+    radial-gradient(60% 55% at 88% 12%, rgba(208, 54, 43, 0.28) 0%, transparent 55%),
+    radial-gradient(55% 60% at 12% 100%, rgba(122, 30, 36, 0.35) 0%, transparent 55%),
+    linear-gradient(160deg, #3D0F13 0%, #29090C 60%, #170608 100%);
+  color: var(--paper, #F5EFE4);
+}

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Check, MapPin, Store, Truck } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, ChevronDown, ChevronUp, Link2, MapPin, Store, Truck } from "lucide-react";
+import { parseMapsUrl } from "@/lib/parseMapsUrl";
 
 // Chargement paresseux : Leaflet + tuiles OSM = ~150 kB, non necessaire hors delivery.
 const DeliveryLocationPicker = lazy(() => import("@/components/DeliveryLocationPicker"));
@@ -29,6 +30,47 @@ export default function CheckoutContactPage() {
   const [state, setState] = useState("loading");
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(null);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [mapsUrl, setMapsUrl] = useState("");
+  const [mapsUrlError, setMapsUrlError] = useState("");
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  // Ouvre auto la section si le user avait deja rempli des coordonnees
+  // (typiquement au retour arriere depuis la page recap).
+  useEffect(() => {
+    if (form.deliveryLatitude != null && form.deliveryLongitude != null) {
+      setLocationOpen(true);
+    }
+  }, [form.deliveryLatitude, form.deliveryLongitude]);
+
+  function handleMapsUrlChange(value) {
+    setMapsUrl(value);
+    setMapsUrlError("");
+    if (!value.trim()) {
+      mergeForm({ deliveryLatitude: null, deliveryLongitude: null });
+      return;
+    }
+    const result = parseMapsUrl(value);
+    if (result.ok) {
+      mergeForm({ deliveryLatitude: result.latitude, deliveryLongitude: result.longitude });
+      setMapsUrlError("");
+    } else if (result.reason === "short_link") {
+      setMapsUrlError("Ouvrez le lien puis copiez l'URL complète depuis la barre du navigateur.");
+    } else if (result.reason === "out_of_range") {
+      setMapsUrlError("Cette position n'est pas dans notre zone de livraison.");
+    } else if (result.reason === "no_coords") {
+      setMapsUrlError("Impossible de lire les coordonnées dans ce lien.");
+    }
+  }
+
+  function clearLocation() {
+    setMapsUrl("");
+    setMapsUrlError("");
+    setPickerVisible(false);
+    mergeForm({ deliveryLatitude: null, deliveryLongitude: null });
+  }
+
+  const hasLocation = form.deliveryLatitude != null && form.deliveryLongitude != null;
 
   useEffect(() => {
     let cancelled = false;
@@ -213,13 +255,85 @@ export default function CheckoutContactPage() {
                     <span>Adresse de livraison</span>
                     <textarea rows={3} value={form.deliveryAddress} onChange={(e) => updateForm("deliveryAddress", e.target.value)} required placeholder="Rue, immeuble, étage, digicode…" />
                   </label>
-                  <Suspense fallback={<p className="pbg-map-picker-loading">Chargement de la carte…</p>}>
-                    <DeliveryLocationPicker
-                      latitude={form.deliveryLatitude}
-                      longitude={form.deliveryLongitude}
-                      onChange={({ latitude, longitude }) => mergeForm({ deliveryLatitude: latitude, deliveryLongitude: longitude })}
-                    />
-                  </Suspense>
+
+                  {/* Section collapsible — position exacte (optionnel) */}
+                  <div className={`pbg-location-optional ${locationOpen ? "is-open" : ""}`}>
+                    <button
+                      type="button"
+                      className="pbg-location-toggle"
+                      onClick={() => setLocationOpen((v) => !v)}
+                      aria-expanded={locationOpen}
+                    >
+                      <MapPin size={14} strokeWidth={2} />
+                      <span className="pbg-location-toggle-label">
+                        Préciser la position exacte
+                        {hasLocation ? <em> · position enregistrée ✓</em> : <small> (optionnel)</small>}
+                      </span>
+                      {locationOpen ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+                    </button>
+
+                    {locationOpen && (
+                      <div className="pbg-location-body">
+                        <p className="pbg-location-help">
+                          Aide le livreur à vous trouver plus facilement, surtout dans un quartier peu connu ou pour un immeuble en fond de cour.
+                        </p>
+
+                        <div className="pbg-location-option">
+                          <div className="pbg-location-option-head">
+                            <Link2 size={13} strokeWidth={2} />
+                            <span>Coller un lien Google Maps</span>
+                          </div>
+                          <input
+                            type="url"
+                            value={mapsUrl}
+                            onChange={(e) => handleMapsUrlChange(e.target.value)}
+                            placeholder="https://maps.google.com/…"
+                            className="pbg-location-input"
+                          />
+                          <small className="pbg-location-hint">
+                            Sur Google Maps → appuyez longuement sur votre position → <em>Partager</em> → copier le lien.
+                          </small>
+                          {mapsUrlError && <p className="pbg-location-error">{mapsUrlError}</p>}
+                        </div>
+
+                        <div className="pbg-location-separator"><span>ou</span></div>
+
+                        <div className="pbg-location-option">
+                          <div className="pbg-location-option-head">
+                            <MapPin size={13} strokeWidth={2} />
+                            <span>Placer un point sur la carte</span>
+                          </div>
+                          {!pickerVisible && !hasLocation && (
+                            <button
+                              type="button"
+                              className="pbg-location-secondary-btn"
+                              onClick={() => setPickerVisible(true)}
+                            >
+                              Ouvrir la carte
+                            </button>
+                          )}
+                          {(pickerVisible || hasLocation) && (
+                            <Suspense fallback={<p className="pbg-map-picker-loading">Chargement de la carte…</p>}>
+                              <DeliveryLocationPicker
+                                latitude={form.deliveryLatitude}
+                                longitude={form.deliveryLongitude}
+                                onChange={({ latitude, longitude }) => {
+                                  mergeForm({ deliveryLatitude: latitude, deliveryLongitude: longitude });
+                                  if (latitude == null && longitude == null) setMapsUrl("");
+                                }}
+                              />
+                            </Suspense>
+                          )}
+                        </div>
+
+                        {hasLocation && (
+                          <button type="button" className="pbg-location-clear" onClick={clearLocation}>
+                            Retirer la position
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 

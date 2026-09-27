@@ -988,3 +988,11 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Ajouter une page back-office dédiée aux communes et tarifs de livraison
 - [x] Ajouter la navigation et connecter la page aux routes API existantes
 - [x] Vérifier les tests backend et le build frontend
+
+## Audit mise en production (2026-09-27)
+- [x] Cartographier les changements récents et l'architecture actuelle
+- [x] Auditer les risques production: données, auth, API, uploads, rate limiting et observabilité
+- [x] Définir la stack finale et la topologie cible sur deux VPS Hostinger
+- [x] Produire une checklist de livraison et un ordre de migration
+
+> Audit réalisé: le rapport de mise en production est fourni dans la réponse du 2026-09-27. Aucun code applicatif n'a été modifié pendant cet audit.

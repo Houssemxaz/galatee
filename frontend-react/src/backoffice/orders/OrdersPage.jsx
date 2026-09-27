@@ -397,6 +397,21 @@ export default function OrdersPage() {
                 ? `${expanded.deliveryAddress}, ${expanded.communeName}`
                 : "Retrait chez Galatée"}
             </p>
+            {expanded.deliveryMode === "delivery" && Number.isFinite(expanded.deliveryLatitude) && Number.isFinite(expanded.deliveryLongitude) && (
+              <p style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 12 }}>
+                <span style={{ color: "var(--bo-ink-muted)" }}>
+                  📍 {expanded.deliveryLatitude.toFixed(5)}, {expanded.deliveryLongitude.toFixed(5)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${expanded.deliveryLatitude},${expanded.deliveryLongitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--bo-brand)", fontWeight: 600, textDecoration: "underline" }}
+                >
+                  Ouvrir dans Maps ↗
+                </a>
+              </p>
+            )}
             <p style={{ color: "var(--bo-ink-muted)", fontSize: 12 }}>
               Paiement à la {expanded.deliveryMode === "delivery" ? "livraison" : "récupération"}
             </p>

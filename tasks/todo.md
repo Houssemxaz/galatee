@@ -996,3 +996,10 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Produire une checklist de livraison et un ordre de migration
 
 > Audit réalisé: le rapport de mise en production est fourni dans la réponse du 2026-09-27. Aucun code applicatif n'a été modifié pendant cet audit.
+
+## Préparation migration PostgreSQL (2026-09-27)
+- [x] Créer un schéma PostgreSQL versionné qui conserve les contrats SQLite et l'historique réservation
+- [x] Ajouter un export/contrôle SQLite en lecture seule avec vérification d'intégrité et clés étrangères
+- [x] Ajouter un import transactionnel vers une base PostgreSQL neuve avec contrôle des colonnes et compteurs
+- [x] Ajouter les commandes, tests et documentation sans basculer encore le runtime applicatif
+- [ ] Ajouter l'adaptateur runtime PostgreSQL après revue de la branche de sécurisation

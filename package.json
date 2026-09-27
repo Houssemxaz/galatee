@@ -9,12 +9,15 @@
     "preview": "npm --prefix frontend-react run preview",
     "start": "node backend/server.js",
     "seed:demo": "node backend/seedDemo.js",
+    "db:postgres:verify": "node backend/postgres/migrate.mjs --verify",
+    "db:postgres:import": "node backend/postgres/migrate.mjs --apply",
     "test": "node --test backend/*.test.js"
   },
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
+    "pg": "^8.16.3",
     "sharp": "^0.35.4"
   }
 }

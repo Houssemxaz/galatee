@@ -44,6 +44,24 @@ test("menu starts with published demo items and keeps draft changes private", as
   assert.equal(menu.listPublished().at(-1).price, "32.00");
 });
 
+test("menu edits update the price entered by the admin", async (t) => {
+  const { menu } = await createSystems(t);
+  const created = menu.create({ title: "Prix modifiable", price: "32", category: "fresca" });
+  menu.setAvailability(created.id, false);
+
+  const updated = menu.update(created.id, { price: "35.50" });
+  assert.equal(updated.current.price, "35.50");
+  assert.equal(updated.draft.priceCents, 3_550);
+  assert.equal(updated.available, false);
+
+  const published = menu.publish(created.id);
+  assert.equal(published.current.price, "35.50");
+  assert.equal(menu.listPublished().find((item) => item.id === created.id)?.price, "35.50");
+
+  const restored = menu.update(created.id, { available: true });
+  assert.equal(restored.available, true);
+});
+
 test("menu items can be archived and restored, but not edited while archived", async (t) => {
   const { menu } = await createSystems(t);
   const created = menu.create({
@@ -94,19 +112,19 @@ test("menu image upload validates bytes and creates a local generated asset path
   assert.match(files[0], /^[0-9a-f-]+\.png$/);
 });
 
-test("site stats stores menu visits and reservation funnel events", async (t) => {
+test("site stats stores menu visits and order funnel events", async (t) => {
   const { analytics } = await createSystems(t);
   const sessionId = "1234567890abcdef";
   analytics.upsertRevenue({ date: "2026-09-03", amount: "12500", note: "Clôture" });
   analytics.recordEvent({ eventName: "menu_viewed", sessionId, pagePath: "/menu" });
-  analytics.recordEvent({ eventName: "reservation_cta_clicked", sessionId, pagePath: "/" });
-  analytics.recordEvent({ eventName: "reservation_submitted", sessionId, pagePath: "/reservation" });
+  analytics.recordEvent({ eventName: "order_cta_clicked", sessionId, pagePath: "/" });
+  analytics.recordEvent({ eventName: "order_submitted", sessionId, pagePath: "/commande" });
 
   const dashboard = analytics.getDashboard({ from: "2026-09-03", to: "2026-09-03", groupBy: "day" });
   assert.equal(dashboard.currency, "DZD");
   assert.equal(dashboard.totals.revenue, "12500.00");
-  assert.equal(dashboard.totals.events.reservationCtaClicked, 1);
-  assert.equal(dashboard.totals.events.reservationSubmitted, 1);
+  assert.equal(dashboard.totals.events.orderCtaClicked, 1);
+  assert.equal(dashboard.totals.events.orderSubmitted, 1);
   assert.equal(dashboard.series[0].period, "2026-09-03");
 
   const siteStats = analytics.getSiteStats({ from: "2026-09-03", to: "2026-09-03", groupBy: "day" });
@@ -188,7 +206,7 @@ test("HTTP menu, upload, revenue and analytics routes preserve admin protection"
   const eventResponse = await fetch(`${baseUrl}/api/analytics/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ eventName: "reservation_started", sessionId: "1234567890abcdef", pagePath: "/reservation" }),
+    body: JSON.stringify({ eventName: "order_started", sessionId: "1234567890abcdef", pagePath: "/commande" }),
   });
   assert.equal(eventResponse.status, 202);
 
@@ -203,7 +221,7 @@ test("HTTP menu, upload, revenue and analytics routes preserve admin protection"
   assert.equal(dashboardResponse.status, 200);
   const dashboard = await dashboardResponse.json();
   assert.equal(dashboard.totals.revenue, "12500.00");
-  assert.equal(dashboard.totals.events.reservationStarted, 1);
+  assert.equal(dashboard.totals.events.orderStarted, 1);
 
   const siteStatsResponse = await fetch(`${baseUrl}/api/admin/site-stats?from=2026-09-03&to=2026-09-03&groupBy=day`, { headers: { Authorization: "Bearer admin-secret" } });
   assert.equal(siteStatsResponse.status, 200);

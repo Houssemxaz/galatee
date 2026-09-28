@@ -3,7 +3,7 @@
  * Palette : zinc dark + emerald accent · Inter + JetBrains Mono
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap");
 
 :root {
   /* ── Zinc scale (dark tech neutrals) ───────────────────────────────── */
@@ -1195,7 +1195,7 @@ button[data-slot="button"]:focus-visible {
 /* ── FORMS (menu dialog, image uploader) ─────────────────────────────────── */
 .bo-form { display: flex; flex-direction: column; gap: 14px; }
 .bo-field-group { display: flex; flex-direction: column; gap: 6px; }
-.bo-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bo-field-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(88px, .75fr) minmax(120px, 1fr); gap: 12px; }
 .bo-form-hint { font-size: 11.5px; color: var(--bo-ink-muted); margin: 4px 0 0; }
 .bo-form-error { font-size: 12px; color: var(--bo-err); margin: 4px 0 0; }
 .bo-textarea {
@@ -1256,6 +1256,24 @@ button[data-slot="button"]:focus-visible {
 @media (max-width: 720px) { .bo-form-grid { grid-template-columns: 1fr; } }
 .bo-image-actions { display: flex; gap: 8px; }
 .bo-image-error { color: var(--bo-err); font-size: 12px; }
+
+/* Menu editor: the wide form must remain a real desktop workspace instead of
+   inheriting the compact driver PIN dialog rules declared later in this file. */
+.bo-dialog.bo-menu-item-dialog {
+  width: min(900px, calc(100% - 48px));
+  max-width: 900px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+.bo-dialog.bo-menu-item-dialog input {
+  letter-spacing: normal;
+  text-align: left;
+}
+.bo-menu-item-dialog .bo-image-actions { flex-wrap: wrap; justify-content: center; }
+@media (max-width: 720px) {
+  .bo-field-row { grid-template-columns: 1fr; }
+  .bo-dialog.bo-menu-item-dialog { width: min(100% - 24px, 560px); max-height: calc(100vh - 24px); padding: 18px; }
+}
 
 /* ── PREVIEW DIALOG ──────────────────────────────────────────────────────── */
 .bo-preview { display: flex; flex-direction: column; gap: 12px; }
@@ -1434,6 +1452,8 @@ button[data-slot="button"]:focus-visible {
 .bo-loyalty-fields label { display: flex; flex-direction: column; gap: 7px; color: var(--bo-ink-soft); font-size: 12px; font-weight: 600; }
 .bo-loyalty-fields input, .bo-loyalty-fields select, .bo-loyalty-fields textarea { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--bo-hairline-strong); border-radius: var(--bo-radius); background: var(--bo-cream-3); color: var(--bo-ink); font: inherit; font-weight: 400; resize: vertical; }
 .bo-loyalty-field-wide { grid-column: span 2; }
+.bo-loyalty-value-help { color: var(--bo-ink-muted); font-size: 11px; font-weight: 400; line-height: 1.35; }
+.bo-loyalty-pack-warning { margin: 18px 0 0; padding: 10px 12px; border: 1px solid var(--bo-warn-border, #E7B45C); border-radius: var(--bo-radius); background: var(--bo-warn-soft, #FFF7E6); color: var(--bo-warn, #8A5A00); font-size: 12px; font-weight: 600; }
 
 /* Portée de la remise : tous les plats ou selection */
 .bo-loyalty-scope { margin: 8px 0 24px; padding: 22px; background: var(--bo-cream-3); border: 1px solid var(--bo-hairline); border-radius: var(--bo-radius); }
@@ -1452,6 +1472,14 @@ button[data-slot="button"]:focus-visible {
 .bo-loyalty-dish-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bo-loyalty-dish-body strong { color: var(--bo-ink); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bo-loyalty-dish-body small { color: var(--bo-ink-muted); font-size: 11px; }
+.bo-loyalty-preview { display: grid; grid-template-columns: minmax(190px, .7fr) minmax(0, 1.3fr); gap: 18px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--bo-hairline); }
+.bo-loyalty-preview p:not(.bo-eyebrow) { margin: 4px 0 0; color: var(--bo-ink-muted); font-size: 12px; line-height: 1.45; }
+.bo-loyalty-preview-result { min-width: 0; padding: 12px 14px; background: var(--bo-cream); border: 1px solid var(--bo-hairline); border-radius: var(--bo-radius); }
+.bo-loyalty-preview-items { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.bo-loyalty-preview-items span { padding: 5px 8px; background: var(--bo-cream-3); border-radius: var(--bo-radius-sm); color: var(--bo-ink-soft); font-size: 11px; }
+.bo-loyalty-preview-equation { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; color: var(--bo-ink-soft); font-size: 12px; }
+.bo-loyalty-preview-equation strong { color: var(--bo-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bo-loyalty-preview-final { display: block; margin-top: 5px; color: var(--bo-emerald-600); font-size: 11px; font-weight: 600; }
 
 .bo-loyalty-actions { padding-top: 18px; border-top: 1px solid var(--bo-hairline); color: var(--bo-ink-muted); font-size: 12px; }
 .bo-loyalty-search { display: flex; align-items: center; gap: 8px; width: min(340px, 100%); color: var(--bo-ink-muted); }
@@ -1478,6 +1506,8 @@ button[data-slot="button"]:focus-visible {
   .bo-loyalty-settings-top, .bo-loyalty-actions, .bo-loyalty-customers .bo-section-heading { align-items: flex-start; flex-direction: column; }
   .bo-loyalty-fields { grid-template-columns: 1fr; }
   .bo-loyalty-field-wide { grid-column: auto; }
+  .bo-loyalty-preview { grid-template-columns: 1fr; }
+  .bo-loyalty-preview-equation { align-items: flex-start; flex-direction: column; gap: 3px; }
   .bo-loyalty-search { width: 100%; }
 }
 
@@ -1938,6 +1968,50 @@ button[data-slot="button"]:focus-visible {
   border-radius: var(--bo-radius);
   border: 1px solid var(--bo-hairline);
 }
+.bo-order-cancel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--bo-hairline);
+  border-left: 3px solid var(--bo-brand);
+  background: var(--bo-panel);
+  border-radius: var(--bo-radius);
+}
+.bo-order-cancel-form label { font-size: 11px; font-weight: 600; color: var(--bo-ink); }
+.bo-order-cancel-reasons { display: grid; gap: 7px; }
+.bo-order-cancel-reason {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--bo-hairline);
+  border-radius: 6px;
+  background: var(--bo-bg);
+  color: var(--bo-ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.bo-order-cancel-reason:hover, .bo-order-cancel-reason.is-selected { border-color: var(--bo-brand); background: var(--bo-brand-soft, var(--bo-panel)); }
+.bo-order-cancel-form textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--bo-hairline);
+  border-radius: 6px;
+  background: var(--bo-bg);
+  color: var(--bo-ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  outline: none;
+}
+.bo-order-cancel-form textarea:focus { border-color: var(--bo-brand); }
+.bo-order-cancel-actions { display: flex; justify-content: flex-end; }
+.bo-order-correction-form { border-color: var(--bo-info, #0EA5E9); background: color-mix(in srgb, var(--bo-info-soft, rgba(14, 165, 233, .1)) 72%, var(--bo-paper)); }
+.bo-order-correction-form .bo-native-select { width: 100%; min-height: 40px; }
 .bo-order-sheet-total {
   font-family: var(--bo-font);
   font-size: 20px;

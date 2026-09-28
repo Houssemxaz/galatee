@@ -11,6 +11,9 @@
     "seed:demo": "node backend/seedDemo.js",
     "db:postgres:verify": "node backend/postgres/migrate.mjs --verify",
     "db:postgres:import": "node backend/postgres/migrate.mjs --apply",
+    "db:postgres:reservations-preview": "node backend/postgres/archiveReservations.mjs",
+    "db:postgres:reservations-remove": "node backend/postgres/archiveReservations.mjs --apply",
+    "db:sqlite:reservations-remove": "node backend/archiveSqliteReservations.mjs",
     "test": "node --test backend/*.test.js"
   },
   "engines": {

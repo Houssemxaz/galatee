@@ -64,6 +64,25 @@ test("enforces the operational order status flow", (t) => {
   assert.throws(() => orders.updateStatus(order, "cancelled"), (error) => error.code === "ORDER_STATUS_TRANSITION_INVALID");
 });
 
+test("allows an audited manual status correction without weakening normal transitions", (t) => {
+  const { menu, orders, store } = createSystems(t);
+  const item = menu.listPublished()[0];
+  const order = orders.createOrder(body([{ productId: item.id }])).id;
+
+  orders.updateStatus(order, "confirmed");
+  orders.updateStatus(order, "ready");
+  orders.updateStatus(order, "delivered");
+  const corrected = orders.correctStatus(order, "ready", "Livrée par erreur, à remettre en préparation.");
+
+  assert.equal(corrected.status, "ready");
+  assert.equal(corrected.deliveredAt, null);
+  assert.equal(corrected.note, "Livrée par erreur, à remettre en préparation.");
+  const history = store.db.prepare("SELECT status, note FROM order_status_history WHERE order_id = ? ORDER BY changed_at DESC, id DESC LIMIT 1").get(order);
+  assert.equal(history.status, "ready");
+  assert.equal(history.note, "Livrée par erreur, à remettre en préparation.");
+  assert.throws(() => orders.updateStatus(order, "pending"), (error) => error.code === "ORDER_STATUS_TRANSITION_INVALID");
+});
+
 test("stores and returns optional delivery coordinates for delivery orders", (t) => {
   const { menu, orders } = createSystems(t);
   const item = menu.listPublished()[0];
@@ -105,6 +124,13 @@ test("keeps commune fees editable and can deactivate a commune", (t) => {
   assert.equal(updated.feeCents, 75_000);
   assert.equal(updated.active, false);
   assert.throws(() => orders.createOrder(body([{ productId: "spaghetti-pomodoro" }])), (error) => error.code === "COMMUNE_UNAVAILABLE");
+});
+
+test("keeps admin input-string commune fees in dinars", (t) => {
+  const { orders } = createSystems(t);
+  const updated = orders.updateCommune("hydra", { fee: "750" });
+  assert.equal(updated.feeCents, 75_000);
+  assert.equal(updated.fee, "750.00");
 });
 
 test("orders published menus and offers with their catalogue type", (t) => {

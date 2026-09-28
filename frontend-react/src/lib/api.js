@@ -51,10 +51,6 @@ export function logoutCustomer() {
   return apiJson("/auth/logout", { method: "POST" });
 }
 
-export function fetchCustomerReservations() {
-  return apiJson("/account/reservations");
-}
-
 export function fetchCustomerOrders() {
   return apiJson("/account/orders");
 }

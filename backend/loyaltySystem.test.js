@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CustomerAuthSystem } from "./customerAuthSystem.js";
-import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
+import { calculateRewardDiscountCents, LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
 import { MenuSystem } from "./menuSystem.js";
 import { OrderSystem } from "./orderSystem.js";
 import { SqliteReservationStore } from "./reservationSystem.js";
@@ -87,4 +87,98 @@ test("validates loyalty settings before saving them", (t) => {
     () => loyalty.updateSettings({ rewardType: "percentage", rewardValue: 101 }),
     (error) => error instanceof LoyaltyError && error.code === "LOYALTY_REWARD_VALUE_INVALID",
   );
+  assert.throws(
+    () => loyalty.updateSettings({ rewardScope: "pack", eligibleDishIds: ["only-one"] }),
+    (error) => error instanceof LoyaltyError && error.code === "LOYALTY_PACK_DISHES_REQUIRED",
+  );
+});
+
+test("calculates percentage rewards from the initial eligible price", () => {
+  assert.equal(calculateRewardDiscountCents(70000, "percentage", 20), 14000);
+  assert.equal(70000 - calculateRewardDiscountCents(70000, "percentage", 20), 56000);
+});
+
+test("calculates fixed rewards from the initial eligible price and caps them", () => {
+  assert.equal(calculateRewardDiscountCents(70000, "fixed", 200), 20000);
+  assert.equal(70000 - calculateRewardDiscountCents(70000, "fixed", 200), 50000);
+  assert.equal(calculateRewardDiscountCents(70000, "fixed", 1000), 70000);
+});
+
+test("persists a fixed reward as a subtraction from the order subtotal", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const item = menu.listPublished()[0];
+  loyalty.updateSettings({ threshold: 1, rewardType: "fixed", rewardValue: 10, title: "-10 DA", description: "Merci", active: true });
+
+  const qualifyingOrder = orders.createOrder(orderBody(item.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  const discounted = orders.createOrder({ ...orderBody(item.id), loyaltyRewardId: reward.id }, { customerId });
+
+  assert.equal(discounted.discountCents, Math.min(discounted.subtotalCents, 1000));
+  assert.equal(discounted.totalCents, discounted.subtotalCents - discounted.discountCents);
+});
+
+test("pack rewards require every selected dish and discount only their combined subtotal", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const [first, second, other] = menu.listPublished();
+  loyalty.updateSettings({
+    threshold: 1,
+    rewardType: "percentage",
+    rewardValue: 20,
+    rewardScope: "pack",
+    eligibleDishIds: [first.id, second.id],
+    title: "Pack -20 %",
+    description: "Merci",
+    active: true,
+  });
+
+  const qualifyingOrder = orders.createOrder(orderBody(other.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  assert.ok(reward);
+
+  assert.throws(
+    () => orders.createOrder({ ...orderBody(first.id), loyaltyRewardId: reward.id }, { customerId }),
+    (error) => error.code === "LOYALTY_REWARD_UNAVAILABLE",
+  );
+
+  const packOrder = orders.createOrder({
+    ...orderBody(first.id),
+    loyaltyRewardId: reward.id,
+    items: [first, second, other].map((item) => ({ productId: item.id, quantity: 1 })),
+  }, { customerId });
+  const eligibleSubtotal = first.priceCents + second.priceCents;
+  assert.equal(packOrder.discountCents, Math.floor(eligibleSubtotal * 20 / 100));
+  assert.equal(packOrder.totalCents, packOrder.subtotalCents - packOrder.discountCents);
+  assert.ok(packOrder.subtotalCents > eligibleSubtotal);
+});
+
+test("fixed pack rewards subtract the fixed amount from the pack subtotal only", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const [first, second, other] = menu.listPublished();
+  loyalty.updateSettings({
+    threshold: 1,
+    rewardType: "fixed",
+    rewardValue: 100,
+    rewardScope: "pack",
+    eligibleDishIds: [first.id, second.id],
+    title: "Pack -100 DA",
+    description: "Merci",
+    active: true,
+  });
+
+  const qualifyingOrder = orders.createOrder(orderBody(other.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  assert.ok(reward);
+
+  const packOrder = orders.createOrder({
+    ...orderBody(first.id),
+    loyaltyRewardId: reward.id,
+    items: [first, second, other].map((item) => ({ productId: item.id, quantity: 1 })),
+  }, { customerId });
+  const eligibleSubtotal = first.priceCents + second.priceCents;
+  const expectedDiscount = Math.min(eligibleSubtotal, 10000);
+  assert.equal(packOrder.discountCents, expectedDiscount);
+  assert.equal(packOrder.totalCents, other.priceCents + eligibleSubtotal - expectedDiscount);
 });

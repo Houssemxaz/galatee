@@ -7,12 +7,8 @@ const EVENT_NAMES = new Set([
   "order_cta_clicked",
   "order_started",
   "order_submitted",
-  "reservation_cta_clicked",
-  "reservation_started",
-  "reservation_submitted",
 ]);
 const GROUP_BYS = new Set(["day", "week", "month", "year"]);
-const RESERVATION_STATUSES = ["requested", "confirmed", "cancelled", "completed"];
 const CONFIRMED_ORDER_STATUSES = ["confirmed", "preparing", "ready", "delivered", "withdrawn", "completed"];
 
 export class AnalyticsError extends Error {
@@ -147,7 +143,6 @@ export class AnalyticsSystem {
     const current = this.queryRange(range, groupBy);
     const orders = this.queryOrderAnalytics(range, groupBy);
     const traffic = this.queryTraffic(range, groupBy);
-    const reservations = current.totals.reservations;
     const events = current.totals.events;
     const seriesPeriods = new Set([
       ...current.series.map((point) => point.period),
@@ -158,13 +153,12 @@ export class AnalyticsSystem {
       const currentPoint = current.series.find((point) => point.period === period);
       const trafficPoint = traffic.series.find((point) => point.period === period);
       const orderPoint = orders.series.find((point) => point.period === period);
-      const emptyCurrent = { reservations: { requested: 0, confirmed: 0, cancelled: 0, completed: 0 }, events: { pageViewed: 0, menuViewed: 0, dishViewed: 0, orderCtaClicked: 0, orderStarted: 0, orderSubmitted: 0, reservationCtaClicked: 0, reservationStarted: 0, reservationSubmitted: 0 } };
+      const emptyCurrent = { events: { pageViewed: 0, menuViewed: 0, dishViewed: 0, orderCtaClicked: 0, orderStarted: 0, orderSubmitted: 0 } };
       return {
         period,
         menuViews: currentPoint?.events.menuViewed || 0,
         siteViews: trafficPoint?.pageViews || 0,
         uniqueVisitors: trafficPoint?.uniqueVisitors || 0,
-        reservations: currentPoint?.reservations || emptyCurrent.reservations,
         orders: orderPoint?.orders || { received: 0, confirmed: 0, cancelled: 0, revenueCents: 0, revenue: "0.00" },
         revenueCents: orderPoint?.orders.revenueCents || 0,
         events: currentPoint?.events || emptyCurrent.events,
@@ -181,7 +175,6 @@ export class AnalyticsSystem {
         uniqueVisitors: traffic.totals.uniqueVisitors,
         traffic: traffic.totals,
         orders: orders.totals,
-        reservations,
         events: {
           pageViewed: events.pageViewed,
           menuViewed: events.menuViewed,
@@ -189,9 +182,6 @@ export class AnalyticsSystem {
           orderCtaClicked: events.orderCtaClicked,
           orderStarted: events.orderStarted,
           orderSubmitted: events.orderSubmitted,
-          reservationCtaClicked: events.reservationCtaClicked,
-          reservationStarted: events.reservationStarted,
-          reservationSubmitted: events.reservationSubmitted,
         },
       },
       series,
@@ -207,12 +197,6 @@ export class AnalyticsSystem {
       FROM daily_revenues
       WHERE date BETWEEN ? AND ?
       GROUP BY period
-    `).all(range.from, range.to);
-    const reservationRows = this.db.prepare(`
-      SELECT ${periodSqlForColumn(groupBy, "date")} AS period, status, COUNT(*) AS count
-      FROM reservations
-      WHERE date BETWEEN ? AND ?
-      GROUP BY period, status
     `).all(range.from, range.to);
     const eventRows = this.db.prepare(`
       SELECT ${periodSqlForEvent(groupBy)} AS period, event_name, COUNT(*) AS count
@@ -230,8 +214,7 @@ export class AnalyticsSystem {
           period,
           revenueCents: 0,
           revenue: "0.00",
-          reservations: { requested: 0, confirmed: 0, cancelled: 0, completed: 0 },
-          events: { pageViewed: 0, menuViewed: 0, dishViewed: 0, orderCtaClicked: 0, orderStarted: 0, orderSubmitted: 0, reservationCtaClicked: 0, reservationStarted: 0, reservationSubmitted: 0 },
+          events: { pageViewed: 0, menuViewed: 0, dishViewed: 0, orderCtaClicked: 0, orderStarted: 0, orderSubmitted: 0 },
         });
       }
       return series.get(period);
@@ -242,10 +225,6 @@ export class AnalyticsSystem {
       point.revenueCents = Number(row.revenue_cents);
       point.revenue = formatAmount(point.revenueCents);
     }
-    for (const row of reservationRows) {
-      const point = ensure(row.period);
-      if (RESERVATION_STATUSES.includes(row.status)) point.reservations[row.status] = Number(row.count);
-    }
     for (const row of eventRows) {
       const point = ensure(row.period);
       const key = {
@@ -255,9 +234,6 @@ export class AnalyticsSystem {
         order_cta_clicked: "orderCtaClicked",
         order_started: "orderStarted",
         order_submitted: "orderSubmitted",
-        reservation_cta_clicked: "reservationCtaClicked",
-        reservation_started: "reservationStarted",
-        reservation_submitted: "reservationSubmitted",
       }[row.event_name];
       if (key) point.events[key] = Number(row.count);
     }
@@ -266,10 +242,6 @@ export class AnalyticsSystem {
     const totals = {
       revenueCents: sortedSeries.reduce((sum, point) => sum + point.revenueCents, 0),
       revenue: formatAmount(sortedSeries.reduce((sum, point) => sum + point.revenueCents, 0)),
-      reservations: Object.fromEntries(RESERVATION_STATUSES.map((status) => [
-        status,
-        sortedSeries.reduce((sum, point) => sum + point.reservations[status], 0),
-      ])),
       events: {
         pageViewed: sortedSeries.reduce((sum, point) => sum + point.events.pageViewed, 0),
         menuViewed: sortedSeries.reduce((sum, point) => sum + point.events.menuViewed, 0),
@@ -277,9 +249,6 @@ export class AnalyticsSystem {
         orderCtaClicked: sortedSeries.reduce((sum, point) => sum + point.events.orderCtaClicked, 0),
         orderStarted: sortedSeries.reduce((sum, point) => sum + point.events.orderStarted, 0),
         orderSubmitted: sortedSeries.reduce((sum, point) => sum + point.events.orderSubmitted, 0),
-        reservationCtaClicked: sortedSeries.reduce((sum, point) => sum + point.events.reservationCtaClicked, 0),
-        reservationStarted: sortedSeries.reduce((sum, point) => sum + point.events.reservationStarted, 0),
-        reservationSubmitted: sortedSeries.reduce((sum, point) => sum + point.events.reservationSubmitted, 0),
       },
     };
     return { totals, series: sortedSeries };
@@ -393,17 +362,19 @@ export class AnalyticsSystem {
 
   queryBusiestSlots(range) {
     return this.db.prepare(`
-      SELECT date, time, COUNT(*) AS reservations
-      FROM reservations
-      WHERE date BETWEEN ? AND ?
-        AND status IN ('requested', 'confirmed', 'completed')
+      SELECT substr(created_at, 1, 10) AS date,
+        substr(created_at, 12, 5) AS time,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE substr(created_at, 1, 10) BETWEEN ? AND ?
+        AND status NOT IN ('cancelled', 'withdrawn')
       GROUP BY date, time
-      ORDER BY reservations DESC, date ASC, time ASC
+      ORDER BY orders DESC, date ASC, time ASC
       LIMIT 8
     `).all(range.from, range.to).map((row) => ({
       date: row.date,
       time: row.time,
-      reservations: Number(row.reservations),
+      orders: Number(row.orders),
     }));
   }
 }

@@ -56,6 +56,42 @@ L'adaptateur de compatibilité exécute les requêtes PostgreSQL dans un worker
 dédié afin de préserver temporairement les contrats synchrones des modules
 existants. SQLite reste le mode recommandé pour le développement local.
 
+Le runtime commande n'initialise plus les tables historiques de réservation.
+Le fichier `schema.sql` les conserve uniquement pour permettre une importation
+historique contrôlée depuis une ancienne base SQLite; l'adaptateur runtime
+ignore ces DDL legacy.
+
+## Archiver puis retirer les réservations historiques
+
+La commande suivante affiche d'abord les objets encore présents sans rien
+modifier :
+
+```powershell
+$env:DATABASE_URL = "postgresql://utilisateur:mot-de-passe@hote:5432/galatee"
+npm run db:postgres:reservations-preview
+```
+
+Pour l'opération destructive, définir explicitement la confirmation et un
+chemin d'archive hors dépôt :
+
+```powershell
+$env:RESERVATION_ARCHIVE_CONFIRM = "YES"
+$env:RESERVATION_ARCHIVE_PATH = "C:\chemin\galatee-reservations-archive.json"
+npm run db:postgres:reservations-remove
+```
+
+Le script écrit l'archive, vérifie son SHA-256, supprime les huit tables
+historiques et les événements analytics de réservation dans une transaction,
+puis vérifie que les objets ont disparu.
+
+La copie SQLite locale de secours peut être nettoyée avec la même confirmation :
+
+```powershell
+$env:RESERVATION_ARCHIVE_CONFIRM = "YES"
+$env:RESERVATION_ARCHIVE_PATH = "C:\chemin\galatee-reservations-sqlite-archive.json"
+npm run db:sqlite:reservations-remove
+```
+
 Ce mode est adapté à la validation et au lancement initial à faible trafic.
 Avant une montée en charge importante, les modules métier devront être
 convertis vers des appels PostgreSQL asynchrones afin d'éviter de sérialiser

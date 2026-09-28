@@ -5,16 +5,31 @@ import { randomUUID } from "node:crypto";
 // On exclut uniquement pending (pas encore confirme) et cancelled.
 const QUALIFYING_STATUSES = ["confirmed", "ready", "delivered"];
 const REWARD_TYPES = new Set(["percentage", "fixed"]);
+const REWARD_SCOPES = new Set(["items", "pack"]);
 const DEFAULT_SETTINGS = {
   id: "default",
   threshold: 10,
   rewardType: "percentage",
   rewardValue: 10,
+  rewardScope: "items",
   title: "Récompense Pasta Lover",
   description: "Une remise sur votre prochaine commande.",
   active: true,
   rewardExpirationDays: 90, // 0 = jamais
 };
+
+function addColumnIfMissing(db, sql) {
+  try {
+    db.exec(sql);
+  } catch (error) {
+    // PostgreSQL schema sync and the application migration can race on a
+    // freshly prepared database. Only ignore that idempotent case.
+    const message = String(error?.message || error);
+    if (error?.code !== "42701" && !/duplicate column|already exists/i.test(message)) {
+      throw error;
+    }
+  }
+}
 
 export class LoyaltyError extends Error {
   constructor(code, message, status = 400, details = {}) {
@@ -42,6 +57,7 @@ export class LoyaltySystem {
         qualifying_order_threshold INTEGER NOT NULL CHECK (qualifying_order_threshold BETWEEN 1 AND 100),
         reward_type TEXT NOT NULL CHECK (reward_type IN ('percentage', 'fixed')),
         reward_value INTEGER NOT NULL CHECK (reward_value > 0),
+        reward_scope TEXT NOT NULL DEFAULT 'items' CHECK (reward_scope IN ('items', 'pack')),
         title TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
         active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
@@ -55,6 +71,7 @@ export class LoyaltySystem {
         qualifying_order_count INTEGER NOT NULL CHECK (qualifying_order_count > 0),
         reward_type TEXT NOT NULL CHECK (reward_type IN ('percentage', 'fixed')),
         reward_value INTEGER NOT NULL CHECK (reward_value > 0),
+        reward_scope TEXT NOT NULL DEFAULT 'items' CHECK (reward_scope IN ('items', 'pack')),
         title TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('available', 'applied', 'expired')),
         applied_order_id TEXT,
@@ -75,9 +92,21 @@ export class LoyaltySystem {
     if (!settingsColumns.some((column) => column.name === "reward_expiration_days")) {
       this.db.exec("ALTER TABLE loyalty_settings ADD COLUMN reward_expiration_days INTEGER NOT NULL DEFAULT 90");
     }
+    if (!settingsColumns.some((column) => column.name === "reward_scope")) {
+      addColumnIfMissing(
+        this.db,
+        "ALTER TABLE loyalty_settings ADD COLUMN reward_scope TEXT NOT NULL DEFAULT 'items'",
+      );
+    }
     const rewardsColumns = this.db.prepare("PRAGMA table_info(loyalty_rewards)").all();
     if (!rewardsColumns.some((column) => column.name === "expires_at")) {
       this.db.exec("ALTER TABLE loyalty_rewards ADD COLUMN expires_at TEXT");
+    }
+    if (!rewardsColumns.some((column) => column.name === "reward_scope")) {
+      addColumnIfMissing(
+        this.db,
+        "ALTER TABLE loyalty_rewards ADD COLUMN reward_scope TEXT NOT NULL DEFAULT 'items'",
+      );
     }
   }
 
@@ -85,12 +114,13 @@ export class LoyaltySystem {
     const timestamp = this.now().toISOString();
     this.db.prepare(`
       INSERT OR IGNORE INTO loyalty_settings
-        (id, qualifying_order_threshold, reward_type, reward_value, title, description, active, reward_expiration_days, created_at, updated_at)
-      VALUES ('default', ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        (id, qualifying_order_threshold, reward_type, reward_value, reward_scope, title, description, active, reward_expiration_days, created_at, updated_at)
+      VALUES ('default', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
     `).run(
       DEFAULT_SETTINGS.threshold,
       DEFAULT_SETTINGS.rewardType,
       DEFAULT_SETTINGS.rewardValue,
+      DEFAULT_SETTINGS.rewardScope,
       DEFAULT_SETTINGS.title,
       DEFAULT_SETTINGS.description,
       DEFAULT_SETTINGS.rewardExpirationDays,
@@ -110,7 +140,7 @@ export class LoyaltySystem {
     const timestamp = this.now().toISOString();
     this.db.prepare(`
       UPDATE loyalty_settings
-      SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?,
+      SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?, reward_scope = ?,
           title = ?, description = ?, active = ?, eligible_dish_ids = ?,
           reward_expiration_days = ?, updated_at = ?
       WHERE id = 'default'
@@ -118,6 +148,7 @@ export class LoyaltySystem {
       settings.threshold,
       settings.rewardType,
       settings.rewardValue,
+      settings.rewardScope,
       settings.title,
       settings.description,
       settings.active ? 1 : 0,
@@ -158,8 +189,8 @@ export class LoyaltySystem {
     // 3) Creation des nouvelles rewards pour chaque palier atteint
     const insert = this.db.prepare(`
       INSERT OR IGNORE INTO loyalty_rewards
-        (id, customer_id, qualifying_order_count, reward_type, reward_value, title, status, created_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'available', ?, ?)
+        (id, customer_id, qualifying_order_count, reward_type, reward_value, reward_scope, title, status, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'available', ?, ?)
     `);
     const expirationDays = progress.settings.rewardExpirationDays;
     const expiresAt = expirationDays > 0
@@ -176,6 +207,7 @@ export class LoyaltySystem {
         milestone,
         progress.settings.rewardType,
         progress.settings.rewardValue,
+        progress.settings.rewardScope,
         progress.settings.title,
         nowIso,
         expiresAt,
@@ -199,7 +231,7 @@ export class LoyaltySystem {
     // ou dont le palier n est plus atteint pour eviter d en presenter une invalide.
     const nowIso = this.now().toISOString();
     const availableReward = this.db.prepare(`
-      SELECT id, qualifying_order_count, reward_type, reward_value, title, status, created_at, expires_at
+      SELECT id, qualifying_order_count, reward_type, reward_value, reward_scope, title, status, created_at, expires_at
       FROM loyalty_rewards
       WHERE customer_id = ? AND status = 'available'
         AND (expires_at IS NULL OR expires_at > ?)
@@ -229,7 +261,7 @@ export class LoyaltySystem {
     const nowIso = this.now().toISOString();
     // On refuse une reward expiree ou dont le palier n est plus atteint.
     const row = this.db.prepare(`
-      SELECT id, customer_id, reward_type, reward_value, title, qualifying_order_count, expires_at
+      SELECT id, customer_id, reward_type, reward_value, reward_scope, title, qualifying_order_count, expires_at
       FROM loyalty_rewards
       WHERE id = ? AND customer_id = ? AND status = 'available'
         AND (expires_at IS NULL OR expires_at > ?)
@@ -240,20 +272,24 @@ export class LoyaltySystem {
     const eligibleIds = settings.eligibleDishIds || [];
     let eligibleAmount = subtotal;
     if (eligibleIds.length && Array.isArray(items)) {
-      eligibleAmount = items
-        .filter((item) => eligibleIds.includes(item.productId || item.id))
-        .reduce((sum, item) => sum + (item.lineTotalCents || 0), 0);
+      const eligibleItems = items.filter((item) => eligibleIds.includes(item.productId || item.id));
+      if (row.reward_scope === "pack") {
+        const presentIds = new Set(eligibleItems.filter((item) => Number(item.quantity) > 0).map((item) => item.productId || item.id));
+        if (eligibleIds.length < 2 || eligibleIds.some((id) => !presentIds.has(id))) return null;
+      }
+      eligibleAmount = eligibleItems.reduce((sum, item) => sum + Math.max(0, Math.trunc(Number(item.lineTotalCents) || 0)), 0);
     }
+    if (eligibleIds.length && eligibleAmount <= 0) return null;
 
-    const discountCents = row.reward_type === "fixed"
-      ? Math.min(eligibleAmount, row.reward_value * 100)
-      : Math.min(eligibleAmount, Math.floor(eligibleAmount * row.reward_value / 100));
+    const discountCents = calculateRewardDiscountCents(eligibleAmount, row.reward_type, row.reward_value);
     return {
       id: row.id,
       title: row.title,
       discountCents,
+      priceAfterRewardCents: Math.max(0, eligibleAmount - discountCents),
       eligibleAmountCents: eligibleAmount,
       appliesToAllDishes: eligibleIds.length === 0,
+      appliesAsPack: row.reward_scope === "pack",
       expiresAt: row.expires_at,
     };
   }
@@ -300,6 +336,13 @@ export class LoyaltySystem {
   }
 }
 
+export function calculateRewardDiscountCents(amountCents, rewardType, rewardValue) {
+  const amount = Math.max(0, Math.trunc(Number(amountCents) || 0));
+  const value = Math.max(0, Math.trunc(Number(rewardValue) || 0));
+  if (rewardType === "fixed") return Math.min(amount, value * 100);
+  return Math.min(amount, Math.floor(amount * value / 100));
+}
+
 function normalizeSettings(input) {
   const threshold = Number(input.threshold);
   if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
@@ -313,6 +356,10 @@ function normalizeSettings(input) {
   if (!Number.isInteger(rewardValue) || rewardValue <= 0 || (rewardType === "percentage" && rewardValue > 100)) {
     throw new LoyaltyError("LOYALTY_REWARD_VALUE_INVALID", "The reward value is invalid.");
   }
+  const rewardScope = String(input.rewardScope || DEFAULT_SETTINGS.rewardScope).trim();
+  if (!REWARD_SCOPES.has(rewardScope)) {
+    throw new LoyaltyError("LOYALTY_REWARD_SCOPE_INVALID", "The loyalty reward scope is invalid.");
+  }
   const title = normalizeText(input.title, "LOYALTY_TITLE_INVALID", 120);
   const description = normalizeText(input.description, "LOYALTY_DESCRIPTION_INVALID", 300, true);
   const eligibleDishIds = Array.isArray(input.eligibleDishIds)
@@ -321,6 +368,9 @@ function normalizeSettings(input) {
         .map((id) => id.trim())
         .slice(0, 100)
     : [];
+  if (rewardScope === "pack" && eligibleDishIds.length < 2) {
+    throw new LoyaltyError("LOYALTY_PACK_DISHES_REQUIRED", "A pack reward requires at least two selected dishes.");
+  }
   const rawExpiration = input.rewardExpirationDays;
   const rewardExpirationDays = rawExpiration === undefined || rawExpiration === null || rawExpiration === ""
     ? DEFAULT_SETTINGS.rewardExpirationDays
@@ -335,6 +385,7 @@ function normalizeSettings(input) {
     threshold,
     rewardType,
     rewardValue,
+    rewardScope,
     title,
     description,
     active: input.active !== false && Number(input.active) !== 0,
@@ -363,6 +414,7 @@ function mapSettingsRow(row) {
     threshold: row.qualifying_order_threshold,
     rewardType: row.reward_type,
     rewardValue: row.reward_value,
+    rewardScope: row.reward_scope || DEFAULT_SETTINGS.rewardScope,
     title: row.title,
     description: row.description,
     active: Boolean(row.active),
@@ -378,6 +430,7 @@ function mapRewardRow(row) {
     qualifyingOrderCount: row.qualifying_order_count,
     rewardType: row.reward_type,
     rewardValue: row.reward_value,
+    rewardScope: row.reward_scope || DEFAULT_SETTINGS.rewardScope,
     title: row.title,
     status: row.status,
     createdAt: row.created_at,

@@ -3,11 +3,13 @@ import { Award, Gift, Search, Save, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
+import { calculateRewardDiscountCents } from "@/lib/loyalty";
 
 const DEFAULT_SETTINGS = {
   threshold: 10,
   rewardType: "percentage",
   rewardValue: 10,
+  rewardScope: "items",
   title: "Récompense Pasta Lover",
   description: "Une remise sur votre prochaine commande.",
   active: true,
@@ -27,6 +29,10 @@ function scopeLabel(settings, dishes) {
     return dish?.current?.title ? `Uniquement : ${dish.current.title}` : "1 plat sélectionné";
   }
   return `${settings.eligibleDishIds.length} plats sélectionnés`;
+}
+
+function formatDzd(cents) {
+  return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
 }
 
 export default function LoyaltyPage() {
@@ -74,12 +80,27 @@ export default function LoyaltyPage() {
   }
 
   function selectAllDishes() {
-    change("eligibleDishIds", []);
+    setSettings((current) => ({ ...current, eligibleDishIds: [], rewardScope: "items" }));
   }
 
   const scope = useMemo(() => (
     settings?.eligibleDishIds?.length ? "specific" : "all"
   ), [settings?.eligibleDishIds]);
+
+  const preview = useMemo(() => {
+    if (!settings) return { items: [], initialCents: 0, discountCents: 0, afterCents: 0 };
+    const selected = settings.eligibleDishIds?.length
+      ? dishes.filter((dish) => settings.eligibleDishIds.includes(dish.id))
+      : dishes;
+    const items = selected.map((dish) => ({
+      id: dish.id,
+      title: dish.current?.title || dish.published?.title || "(sans titre)",
+      priceCents: Math.max(0, Number(dish.current?.priceCents ?? dish.published?.priceCents ?? 0)),
+    }));
+    const initialCents = items.reduce((sum, item) => sum + item.priceCents, 0);
+    const discountCents = calculateRewardDiscountCents(initialCents, settings.rewardType, settings.rewardValue);
+    return { items, initialCents, discountCents, afterCents: Math.max(0, initialCents - discountCents) };
+  }, [dishes, settings]);
 
   async function save(event) {
     event.preventDefault();
@@ -92,6 +113,7 @@ export default function LoyaltyPage() {
           ...settings,
           threshold: Number(settings.threshold),
           rewardValue: Number(settings.rewardValue),
+          rewardScope: settings.rewardScope || "items",
           rewardExpirationDays: Number(settings.rewardExpirationDays ?? 90),
           eligibleDishIds: settings.eligibleDishIds || [],
         }),
@@ -164,6 +186,21 @@ export default function LoyaltyPage() {
                 </select>
               </label>
               <label>
+                Application de la remise
+                <select
+                  value={settings.rewardScope || "items"}
+                  onChange={(event) => change("rewardScope", event.target.value)}
+                >
+                  <option value="items">Plats éligibles présents</option>
+                  <option value="pack">Pack complet</option>
+                </select>
+                <small className="bo-loyalty-value-help">
+                  {settings.rewardScope === "pack"
+                    ? "Tous les plats sélectionnés doivent être dans la commande."
+                    : "La remise porte uniquement sur les plats éligibles présents."}
+                </small>
+              </label>
+              <label>
                 Valeur de la récompense
                 <input
                   type="number"
@@ -172,6 +209,11 @@ export default function LoyaltyPage() {
                   value={settings.rewardValue}
                   onChange={(event) => change("rewardValue", event.target.value)}
                 />
+                <small className="bo-loyalty-value-help">
+                  {settings.rewardType === "percentage"
+                    ? "Calcul : prix initial − pourcentage = prix après remise."
+                    : "Calcul : prix initial − montant en DA = prix après remise."}
+                </small>
               </label>
               <label>
                 Nom de la récompense
@@ -266,6 +308,41 @@ export default function LoyaltyPage() {
                       </label>
                     );
                   })}
+                </div>
+              )}
+
+              {settings.rewardScope === "pack" && settings.eligibleDishIds?.length < 2 && (
+                <p className="bo-loyalty-pack-warning" role="alert">
+                  Sélectionnez au moins 2 plats pour construire un pack.
+                </p>
+              )}
+
+              {preview.items.length > 0 && !(settings.rewardScope === "pack" && settings.eligibleDishIds?.length < 2) && (
+                <div className="bo-loyalty-preview" aria-live="polite">
+                  <div>
+                    <p className="bo-eyebrow">Aperçu du calcul</p>
+                    <p>
+                      {scope === "specific"
+                        ? settings.rewardScope === "pack"
+                          ? `Simulation du pack complet sur ${preview.items.length} plats.`
+                          : `Simulation sur ${preview.items.length} article${preview.items.length > 1 ? "s" : ""} sélectionné${preview.items.length > 1 ? "s" : ""}.`
+                        : "Simulation sur les articles actuels : la remise s'applique au sous-total éligible de la commande."}
+                    </p>
+                  </div>
+                  <div className="bo-loyalty-preview-result">
+                    <div className="bo-loyalty-preview-items">
+                      {preview.items.map((item) => (
+                        <span key={item.id}>{item.title} · {formatDzd(item.priceCents)}</span>
+                      ))}
+                    </div>
+                    <div className="bo-loyalty-preview-equation">
+                      <span>Sous-total initial</span>
+                      <strong>{formatDzd(preview.initialCents)}</strong>
+                      <span>− {settings.rewardType === "percentage" ? `${settings.rewardValue}% (${formatDzd(preview.discountCents)})` : formatDzd(Number(settings.rewardValue) * 100)}</span>
+                      <strong>= {formatDzd(preview.afterCents)}</strong>
+                    </div>
+                    <small className="bo-loyalty-preview-final">Prix après remise</small>
+                  </div>
                 </div>
               )}
             </div>

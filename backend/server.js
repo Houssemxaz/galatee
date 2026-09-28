@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
+import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize, sep } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AnalyticsError, AnalyticsSystem } from "./analyticsSystem.js";
 import {
@@ -13,18 +15,12 @@ import { OrderError, OrderSystem } from "./orderSystem.js";
 import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
 import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
-import {
-  ReservationError,
-  ReservationSystem,
-  SqliteReservationStore,
-} from "./reservationSystem.js";
 import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
 const reactDistDir = join(rootDir, "frontend-react", "dist");
 const databasePath = join(rootDir, "backend", "data", "galatee.sqlite");
-const legacyJsonPath = join(rootDir, "backend", "data", "reservations.json");
 const menuUploadDir = join(rootDir, "backend", "data", "uploads", "menu");
 const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
@@ -32,18 +28,15 @@ const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";
 const usePostgres = (process.env.GALATEE_DATABASE || "sqlite").toLowerCase() === "postgres";
 const runtimeDatabase = usePostgres
   ? new PostgresSyncDatabase({ connectionString: process.env.DATABASE_URL })
-  : null;
+  : openSqliteDatabase(databasePath);
 
-const reservationSystem = new ReservationSystem({
-  store: new SqliteReservationStore({ db: runtimeDatabase, databasePath, legacyJsonPath }),
-});
-const menuSystem = new MenuSystem({ db: reservationSystem.store.db, uploadRoot: menuUploadDir });
-const loyaltySystem = new LoyaltySystem({ db: reservationSystem.store.db });
-const orderSystem = new OrderSystem({ db: reservationSystem.store.db, menu: menuSystem, loyalty: loyaltySystem });
-const analyticsSystem = new AnalyticsSystem({ db: reservationSystem.store.db });
-const customerAuthSystem = new CustomerAuthSystem({ db: reservationSystem.store.db });
-const clubSystem = new ClubSystem({ db: reservationSystem.store.db });
-const driverSystem = new DriverSystem({ db: reservationSystem.store.db });
+const menuSystem = new MenuSystem({ db: runtimeDatabase, uploadRoot: menuUploadDir });
+const loyaltySystem = new LoyaltySystem({ db: runtimeDatabase });
+const orderSystem = new OrderSystem({ db: runtimeDatabase, menu: menuSystem, loyalty: loyaltySystem });
+const analyticsSystem = new AnalyticsSystem({ db: runtimeDatabase });
+const customerAuthSystem = new CustomerAuthSystem({ db: runtimeDatabase });
+const clubSystem = new ClubSystem({ db: runtimeDatabase });
+const driverSystem = new DriverSystem({ db: runtimeDatabase });
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -59,7 +52,6 @@ const mimeTypes = new Map([
 ]);
 
 export function createApp({
-  system = reservationSystem,
   menu = menuSystem,
   orders = orderSystem,
   loyalty = loyaltySystem,
@@ -216,8 +208,12 @@ export function createApp({
         assertAdminAuthorized(request, requiredAdminToken);
         const body = await readJsonBody(request);
         const orderId = decodeURIComponent(orderStatusMatch[1]);
-        const order = orders.updateStatus(orderId, body.status, body.note);
-        if (["delivered", "withdrawn", "completed"].includes(order.status) && order.customerId) {
+        const previous = orders.getOrder(orderId);
+        const order = body.correction
+          ? orders.correctStatus(orderId, body.status, body.note)
+          : orders.updateStatus(orderId, body.status, body.note);
+        const loyaltyStatuses = new Set(["delivered", "withdrawn", "completed"]);
+        if ((loyaltyStatuses.has(order.status) || loyaltyStatuses.has(previous?.status)) && order.customerId) {
           loyalty.syncCustomerRewards(order.customerId);
         }
         return sendJson(response, 200, {
@@ -459,7 +455,19 @@ export function createApp({
         const session = drivers.getSession(request);
         if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
         const body = await readJsonBody(request);
+        if (body.deliveryAttempt === true) {
+          return sendJson(response, 200, drivers.markDeliveryCancelledByDriver(session.driver.id, decodeURIComponent(driverCancelMatch[1]), body.reason));
+        }
         return sendJson(response, 200, drivers.markCancelledByDriver(session.driver.id, decodeURIComponent(driverCancelMatch[1]), body.reason));
+      }
+
+      // Annuler une livraison après le départ (client absent, refus ou problème à l'arrivée).
+      const driverDeliveryCancelMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/cancel-delivery$/);
+      if (driverDeliveryCancelMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        const body = await readJsonBody(request);
+        return sendJson(response, 200, drivers.markDeliveryCancelledByDriver(session.driver.id, decodeURIComponent(driverDeliveryCancelMatch[1]), body.reason));
       }
 
       const driverOrderStartMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/start$/);
@@ -499,7 +507,7 @@ export function createApp({
 
       return serveStatic(url.pathname, request.method, response);
     } catch (error) {
-      if (error instanceof ReservationError || error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
+      if (error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
         return sendJson(response, error.status, {
           error: {
             code: error.code,
@@ -527,11 +535,20 @@ export function createApp({
         });
       }
 
+      if (error.code === "REQUEST_BODY_TOO_LARGE") {
+        return sendJson(response, 413, {
+          error: {
+            code: "REQUEST_BODY_TOO_LARGE",
+            message: "Request body is too large.",
+          },
+        });
+      }
+
       console.error(error);
       return sendJson(response, 500, {
         error: {
           code: "INTERNAL_ERROR",
-          message: "Unexpected reservation service error.",
+          message: "Unexpected server error.",
         },
       });
     }
@@ -643,7 +660,9 @@ async function readJsonBody(request) {
   for await (const chunk of request) {
     raw += chunk;
     if (raw.length > 32_000) {
-      throw new ReservationError("REQUEST_BODY_TOO_LARGE", "Request body is too large.", 413);
+      const error = new Error("Request body is too large.");
+      error.code = "REQUEST_BODY_TOO_LARGE";
+      throw error;
     }
   }
 
@@ -744,6 +763,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   createApp().listen(port, () => {
     console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
-    console.log(`Galatee reservation server listening on http://localhost:${port}`);
+    console.log(`Galatee order server listening on http://localhost:${port}`);
   });
+}
+
+function openSqliteDatabase(pathname) {
+  mkdirSync(dirname(pathname), { recursive: true });
+  const db = new DatabaseSync(pathname);
+  db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
+  return db;
 }

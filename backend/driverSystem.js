@@ -319,6 +319,52 @@ export class DriverSystem {
     return { orderId, cancelledAt: nowIso, reason: cleanReason };
   }
 
+  // Annulation après départ : le client refuse ou ne récupère finalement pas la commande.
+  // La course reste attribuée au livreur pour conserver l'imputation dans ses stats,
+  // mais son statut annulé l'exclut des livraisons et du chiffre d'affaires réalisé.
+  markDeliveryCancelledByDriver(driverId, orderId, reason) {
+    const cleanReason = String(reason || "").trim().slice(0, 200);
+    if (!cleanReason) throw new DriverError("CANCEL_REASON_REQUIRED", "Un motif d'annulation est requis.");
+    const nowIso = this.now().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db.prepare("SELECT note FROM orders WHERE id = ?").get(orderId);
+      const enrichedNote = `${existing?.note || ""}${existing?.note ? "\n" : ""}[Livreur] Livraison annulée : ${cleanReason}`.slice(0, 1000);
+      const result = this.db.prepare(`
+        UPDATE orders
+        SET status = 'cancelled', note = ?, updated_at = ?
+        WHERE id = ?
+          AND assigned_driver_id = ?
+          AND status = 'ready'
+          AND driver_started_at IS NOT NULL
+      `).run(enrichedNote, nowIso, orderId, driverId);
+      if (!result.changes) {
+        throw new DriverError(
+          "ORDER_NOT_DELIVERY_CANCELLABLE",
+          "Cette livraison ne peut pas encore être annulée à cette étape.",
+          409,
+        );
+      }
+      this.db.prepare(`
+        INSERT INTO order_status_history (order_id, status, note, changed_at)
+        VALUES (?, 'cancelled', ?, ?)
+      `).run(orderId, `Livraison annulée par livreur : ${cleanReason}`, nowIso);
+      const stillBusy = this.db.prepare(`
+        SELECT COUNT(*) AS count FROM orders
+        WHERE assigned_driver_id = ? AND status IN ('confirmed', 'ready')
+      `).get(driverId).count;
+      if (stillBusy === 0) {
+        this.db.prepare("UPDATE drivers SET current_status = 'available', updated_at = ? WHERE id = ?")
+          .run(nowIso, driverId);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return { orderId, cancelledAt: nowIso, reason: cleanReason };
+  }
+
   assignOrder(orderId, driverId) {
     const driver = this.getById(driverId);
     if (!driver.active) throw new DriverError("DRIVER_INACTIVE", "Ce livreur n est plus actif.", 409);
@@ -457,14 +503,16 @@ export class DriverSystem {
       SELECT o.id, o.order_number, o.first_name, o.last_name,
              o.commune_name, o.delivery_address,
              o.subtotal_cents, o.delivery_fee_cents, o.total_cents,
-             o.status, o.delivered_at, o.driver_assigned_at, o.created_at
+             o.status, o.delivered_at, o.driver_assigned_at, o.updated_at, o.created_at
       FROM orders o
       WHERE o.assigned_driver_id = ?
-        AND o.delivered_at IS NOT NULL
-        AND o.delivered_at >= ?
-      ORDER BY o.delivered_at DESC
+        AND (
+          (o.delivered_at IS NOT NULL AND o.delivered_at >= ?)
+          OR (o.status = 'cancelled' AND o.updated_at >= ?)
+        )
+      ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC
       LIMIT 100
-    `).all(driverId, since);
+    `).all(driverId, since, since);
     return rows.map(mapHistoryRow);
   }
 
@@ -518,7 +566,7 @@ export class DriverSystem {
   _hydrateOrderForDriver(row) {
     const items = this.db.prepare(`
       SELECT product_id, title, unit_price_cents, quantity, line_total_cents
-      FROM order_items WHERE order_id = ? ORDER BY rowid
+      FROM order_items WHERE order_id = ? ORDER BY position, id
     `).all(row.id).map((item) => ({
       productId: item.product_id,
       title: item.title,
@@ -669,6 +717,7 @@ function mapHistoryRow(row) {
     totalCents: row.total_cents,
     status: row.status,
     deliveredAt: row.delivered_at,
+    cancelledAt: row.status === "cancelled" ? row.updated_at : null,
     driverAssignedAt: row.driver_assigned_at,
     createdAt: row.created_at,
   };

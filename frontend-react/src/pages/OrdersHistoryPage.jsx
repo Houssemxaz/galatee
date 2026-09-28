@@ -117,6 +117,12 @@ function OrderCard({ order, onReorder, disabled }) {
         ))}
       </ul>
 
+      {order.status === "cancelled" && order.note && (
+        <p className="pbg-order-card-cancel-reason">
+          <strong>Motif d’annulation :</strong> {order.note}
+        </p>
+      )}
+
       <footer className="pbg-order-card-foot">
         <div className="pbg-order-card-total">
           <span>Total</span>

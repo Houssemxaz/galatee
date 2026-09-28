@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, CheckCircle2, XCircle } from "lucide-react";
 import { fetchDriverOrders } from "./api";
+import DriverBottomNav from "./DriverBottomNav.jsx";
 
 const STATUS_LABELS = {
   delivered: "Livrée",
@@ -78,7 +79,7 @@ export default function DriverStatsPage({ driver }) {
                     #{order.orderNumber.split("-").pop()} · {order.firstName} {order.lastName || ""}
                   </p>
                   <p className="pbg-drv-history-meta">
-                    {formatDate(order.deliveredAt || order.driverAssignedAt)} · {formatTime(order.deliveredAt || order.driverAssignedAt)}
+                    {formatDate(order.cancelledAt || order.deliveredAt || order.driverAssignedAt)} · {formatTime(order.cancelledAt || order.deliveredAt || order.driverAssignedAt)}
                     {" · "}{order.communeName || "—"}
                   </p>
                 </div>
@@ -90,6 +91,8 @@ export default function DriverStatsPage({ driver }) {
           </section>
         </>
       )}
+
+      <DriverBottomNav showLogout={false} />
     </>
   );
 }

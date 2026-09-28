@@ -98,8 +98,133 @@
     to { transform: scaleX(1); }
   }
 
-  /* ── MENU - Grille desktop simple (bento désactivé sur demande user) ── */
-  /* On garde la grille par défaut d'App.css : responsive uniforme.       */
+  /* ── MENU - Rail éditorial de la carte ───────────────────────────── */
+  .pbg-menu-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: clamp(32px, 5vw, 72px);
+    align-items: start;
+  }
+  .pbg-menu-main { min-width: 0; }
+  .pbg-menu-editorial-rail {
+    display: block;
+    position: sticky;
+    top: 32px;
+    padding: 8px 0 0 26px;
+    border-left: 1px solid rgba(49, 49, 24, 0.18);
+  }
+  .pbg-menu-editorial-kicker {
+    margin: 0 0 10px;
+    color: var(--accent, #D0362B);
+    font-family: "DM Sans", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  .pbg-menu-editorial-lede {
+    max-width: 260px;
+    margin: 0 0 26px;
+    color: rgba(49, 49, 24, 0.66);
+    font-family: "DM Sans", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .pbg-menu-editorial-list { border-top: 1px solid rgba(49, 49, 24, 0.2); }
+  .pbg-menu-editorial-item {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 20px 0;
+    border-bottom: 1px solid rgba(49, 49, 24, 0.16);
+    color: inherit;
+    text-decoration: none;
+    transition: padding-left 320ms var(--ease-cinematic);
+  }
+  .pbg-menu-editorial-item:hover { padding-left: 8px; }
+  .pbg-menu-editorial-index {
+    color: var(--accent, #D0362B);
+    font-family: "Antonio", sans-serif;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .pbg-menu-editorial-copy { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+  .pbg-menu-editorial-label {
+    color: rgba(49, 49, 24, 0.58);
+    font-family: "DM Sans", sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .pbg-menu-editorial-title {
+    color: var(--charcoal, #313118);
+    font-family: "Antonio", sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 0.98;
+    text-transform: uppercase;
+  }
+  .pbg-menu-editorial-summary {
+    overflow: hidden;
+    color: rgba(49, 49, 24, 0.64);
+    font-family: "DM Sans", sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pbg-menu-editorial-price {
+    padding-top: 2px;
+    color: var(--accent, #D0362B);
+    font-family: "DM Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .pbg-menu-editorial-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 24px;
+    color: var(--charcoal, #313118);
+    font-family: "DM Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    text-transform: uppercase;
+    transition: gap 240ms var(--ease-cinematic), color 240ms ease;
+  }
+  .pbg-menu-editorial-cta:hover { gap: 14px; color: var(--accent, #D0362B); }
+
+  .pbg-dish-card-title-row,
+  .home-menu-card-title-row { align-items: baseline; }
+  .pbg-dish-card-price,
+  .home-menu-card-price { font-size: 14px; }
+
+  /* Menu : composition pleine largeur, comme la grille d'origine. */
+  .page-menu .pbg-page-header {
+    padding-top: clamp(72px, 8vw, 112px);
+    padding-bottom: clamp(28px, 3vw, 44px);
+  }
+  .page-menu .pbg-page-header .pbg-page-shell { text-align: center; }
+  .page-menu .pbg-page-kicker { justify-content: center; }
+  .page-menu .pbg-page-title {
+    max-width: none;
+    margin-inline: auto;
+  }
+  .page-menu .pbg-page-lede {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  .page-menu .pbg-menu-section { padding-top: clamp(28px, 3vw, 44px); }
+  .page-menu .pbg-menu-layout { display: block; }
+  .page-menu .pbg-menu-main { width: 100%; }
+  .page-menu .pbg-menu-editorial-rail { display: none; }
+  .page-menu .pbg-dish-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
   /* ── MENU - Cards avec hover magnetique + reveal caption ────────── */
   .pbg-dish-card {
@@ -310,12 +435,24 @@
   /* ── INFORMATIONS - Grid asymetrique 2 colonnes ──────────────────── */
   .pbg-info-grid {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
+    gap: 24px 32px;
     margin-top: 48px;
   }
   .pbg-info-grid > *:first-child {
     grid-row: span 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
+    padding: 42px 36px;
+  }
+  .pbg-info-grid > *:nth-child(2),
+  .pbg-info-grid > *:nth-child(3) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 250px;
   }
 
   /* ── INFOS - Panneau "Commander" avec depth ──────────────────────── */
@@ -324,6 +461,100 @@
     grid-template-columns: 0.9fr 1.1fr;
     gap: 40px;
     align-items: start;
+  }
+
+  /* ── INFORMATIONS - Evenements prives, composition desktop ────────── */
+  /* Le mobile garde la pile compacte d'App.css. Sur grand ecran, le
+     contenu respire dans une colonne centrale et les details forment un
+     rail stable, plus facile a parcourir d'un seul regard. */
+  .pbg-info-events-inner {
+    width: min(100%, 1120px);
+    min-height: clamp(560px, 68vh, 720px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .pbg-info-events-inner .pbg-section-index {
+    margin-bottom: 24px;
+  }
+  .pbg-info-events-inner .pbg-section-title {
+    width: min(100%, 880px);
+    margin: 0 auto 24px;
+  }
+  .pbg-info-events-inner .pbg-section-lede {
+    width: min(100%, 780px);
+    max-width: none;
+    margin: 0 auto 42px;
+    color: rgba(245, 239, 228, 0.92);
+  }
+  .pbg-info-events-actions {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.8fr) repeat(2, minmax(210px, 1fr));
+    align-items: center;
+    width: min(100%, 900px);
+    gap: 0;
+    padding-top: 24px;
+    border-top: 1px solid rgba(245, 239, 228, 0.28);
+  }
+  .pbg-info-events-actions .pbg-btn {
+    justify-self: start;
+  }
+  .pbg-info-events-meta {
+    min-height: 54px;
+    justify-content: center;
+    padding-left: 32px;
+    border-left: 1px solid rgba(245, 239, 228, 0.22);
+  }
+  .pbg-info-events-meta span {
+    color: rgba(245, 239, 228, 0.7);
+  }
+  .pbg-info-events-meta strong {
+    color: var(--paper);
+  }
+
+  /* ── INFORMATIONS - Accent culinaire des regimes ─────────────────── */
+  .pbg-info-diet {
+    overflow: hidden;
+  }
+  .pbg-info-diet::before {
+    display: none;
+  }
+  .pbg-info-diet-art {
+    display: block;
+    position: absolute;
+    top: 7%;
+    right: clamp(12px, 5vw, 96px);
+    width: clamp(140px, 14vw, 270px);
+    height: auto;
+    opacity: 0.94;
+    transform: rotate(7deg);
+    filter: drop-shadow(0 18px 22px rgba(49, 49, 24, 0.14));
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  .pbg-info-diet > .pbg-page-shell {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* La couche desktop generique redefinit la couleur des ledes. */
+  .pbg-info-events .pbg-section-lede,
+  .pbg-info-events .pbg-section-lede-light {
+    color: var(--paper) !important;
+    opacity: 0.92;
+  }
+  .pbg-info-events .pbg-section-index-light {
+    color: var(--gold) !important;
+  }
+  .pbg-info-events .pbg-section-index-light span {
+    color: var(--paper) !important;
+  }
+  .pbg-info-events .pbg-section-index-light i {
+    background: var(--gold) !important;
   }
 
   /* ── ELEMENTS DECORATIFS - Editorial number badges ───────────────── */

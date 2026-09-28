@@ -6,6 +6,16 @@ import { Worker } from "node:worker_threads";
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const defaultSchemaPath = join(moduleDir, "schema.sql");
 const RESPONSE_TIMEOUT_MS = 30_000;
+export const RETIRED_RESERVATION_TABLES = new Set([
+  "services",
+  "restaurant_tables",
+  "reservations",
+  "blocked_time_slots",
+  "reservation_table_assignments",
+  "availability_settings",
+  "availability_settings_history",
+  "availability_events",
+]);
 
 /**
  * Temporary compatibility adapter for the current synchronous domain modules.
@@ -16,6 +26,7 @@ export class PostgresSyncDatabase {
   constructor({ connectionString, schemaPath = defaultSchemaPath } = {}) {
     if (!connectionString) throw new Error("A PostgreSQL connection string is required.");
 
+    this.isPostgres = true;
     this.worker = new Worker(new URL("./syncWorker.mjs", import.meta.url), {
       workerData: { connectionString },
     });
@@ -33,7 +44,6 @@ export class PostgresSyncDatabase {
       if (!normalized) continue;
       if (/^PRAGMA\b/i.test(normalized)) continue;
       if (/^CREATE\s+(?:TABLE|INDEX)\b/i.test(normalized)) continue;
-      if (/^ALTER\s+TABLE\b/i.test(normalized)) continue;
       this.execute(normalized);
     }
   }
@@ -74,20 +84,29 @@ export class PostgresSyncDatabase {
   applyVersionedSchema(schema) {
     for (const statement of splitSqlStatements(schema)) {
       const normalized = stripLeadingComments(statement).trim();
-      if (normalized) this.execute(normalized);
+      if (!normalized || isRetiredReservationSchema(normalized)) continue;
+      this.execute(normalized);
     }
   }
 
   readTableInfo(tableName) {
     if (!/^[a-z_][a-z0-9_]*$/i.test(tableName)) throw new Error(`Unsafe table name: ${tableName}`);
     return this.execute(
-      `SELECT ordinal_position - 1 AS cid, column_name AS name, data_type AS type
+      `SELECT ordinal_position - 1 AS cid, column_name AS name, data_type AS type, is_identity
        FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1
        ORDER BY ordinal_position`,
       [tableName],
     );
   }
+}
+
+function isRetiredReservationSchema(sql) {
+  if (!/^CREATE\s+(?:(?:UNIQUE\s+)?INDEX|TABLE)/i.test(sql)) return false;
+  return [...RETIRED_RESERVATION_TABLES].some((table) => {
+    const identifier = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${identifier}\\b`, "i").test(sql);
+  });
 }
 
 class PostgresStatement {

@@ -8,15 +8,13 @@ import { Link, useNavigate } from "react-router-dom";
 import Reveal from "@/components/Reveal";
 import ShineCTA from "@/components/ShineCTA";
 import SEO from "@/components/SEO";
+import { calculateRewardDiscountCents, getEligibleLines, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
 import { createOrder, fetchCustomerOrders, fetchDeliveryCommunes, fetchMenu, trackEvent } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { useCheckoutForm } from "@/context/CheckoutFormContext";
-
-function formatDzd(cents) {
-  return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
-}
+import { formatDzd } from "@/lib/formatters";
 
 export default function CheckoutContactPage() {
   const navigate = useNavigate();
@@ -103,16 +101,19 @@ export default function CheckoutContactPage() {
   const selectedCommune = communes.find((commune) => commune.id === form.communeId);
   const deliveryFee = form.deliveryMode === "delivery" ? (selectedCommune?.feeCents || 0) : 0;
   const reward = loyalty?.rewardAvailable;
-  const eligibleIds = loyalty?.settings?.eligibleDishIds || [];
-  const eligibleSubtotal = eligibleIds.length
-    ? lines.filter((item) => eligibleIds.includes(item.id)).reduce((sum, item) => sum + item.lineTotal, 0)
-    : subtotal;
-  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId
-    ? reward.rewardType === "fixed"
-      ? Math.min(eligibleSubtotal, reward.rewardValue * 100)
-      : Math.min(eligibleSubtotal, Math.floor(eligibleSubtotal * reward.rewardValue / 100))
+  const loyaltySettings = loyalty?.settings || {};
+  const eligibleIds = loyaltySettings.eligibleDishIds || [];
+  const eligibleLines = getEligibleLines(lines, loyaltySettings);
+  const eligibleSubtotal = eligibleLines.reduce((sum, item) => sum + item.lineTotal, 0);
+  const rewardApplicable = isRewardApplicable(lines, loyaltySettings);
+  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
+    ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
     : 0;
   const total = Math.max(0, subtotal + deliveryFee - discount);
+
+  useEffect(() => {
+    if (form.loyaltyRewardId && reward && !rewardApplicable) updateForm("loyaltyRewardId", "");
+  }, [form.loyaltyRewardId, reward, rewardApplicable, updateForm]);
 
   // Redirect back to /commande if the cart is empty (deep-linked with nothing to buy).
   useEffect(() => {
@@ -356,7 +357,12 @@ export default function CheckoutContactPage() {
                       {reward?.rewardType === "percentage" && ` (−${reward.rewardValue}%)`}
                       {reward?.rewardType === "fixed" && ` (−${reward.rewardValue} DA)`}
                     </span>
-                    <strong>− {formatDzd(discount)}</strong>
+                    <strong>
+                      − {formatDzd(discount)}
+                      <small className="order-inline-discount-calculation">
+                        {rewardCalculationLabel(eligibleSubtotal, reward.rewardType, reward.rewardValue, formatDzd)}
+                      </small>
+                    </strong>
                   </p>
                 )}
                 <p className="order-inline-total">

@@ -11,10 +11,8 @@ import PopCTA from "@/components/PopCTA";
 import GlowCard from "@/components/GlowCard";
 import DishImage from "@/components/DishImage";
 import SEO from "@/components/SEO";
-
-function formatDzd(cents) {
-  return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
-}
+import { calculateRewardDiscountCents, getEligibleLines, getMissingEligibleTitles, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { formatDzd } from "@/lib/formatters";
 
 export default function OrderPage() {
   const [searchParams] = useSearchParams();
@@ -55,19 +53,21 @@ export default function OrderPage() {
   );
   const subtotal = lines.reduce((sum, item) => sum + item.lineTotal, 0);
   const reward = loyalty?.rewardAvailable;
-  const eligibleIds = loyalty?.settings?.eligibleDishIds || [];
-  const eligibleSubtotal = eligibleIds.length
-    ? lines.filter((item) => eligibleIds.includes(item.id)).reduce((sum, item) => sum + item.lineTotal, 0)
-    : subtotal;
-  const eligibleTitles = eligibleIds.length
-    ? lines.filter((item) => eligibleIds.includes(item.id)).map((item) => item.title)
-    : [];
-  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId
-    ? reward.rewardType === "fixed"
-      ? Math.min(eligibleSubtotal, reward.rewardValue * 100)
-      : Math.min(eligibleSubtotal, Math.floor(eligibleSubtotal * reward.rewardValue / 100))
+  const loyaltySettings = loyalty?.settings || {};
+  const eligibleIds = loyaltySettings.eligibleDishIds || [];
+  const eligibleLines = getEligibleLines(lines, loyaltySettings);
+  const eligibleSubtotal = eligibleLines.reduce((sum, item) => sum + item.lineTotal, 0);
+  const eligibleTitles = eligibleLines.map((item) => item.title);
+  const missingPackTitles = getMissingEligibleTitles(lines, menu, loyaltySettings);
+  const rewardApplicable = isRewardApplicable(lines, loyaltySettings);
+  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
+    ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
     : 0;
   const totalEstimated = Math.max(0, subtotal - discount);
+
+  useEffect(() => {
+    if (form.loyaltyRewardId && reward && !rewardApplicable) updateForm("loyaltyRewardId", "");
+  }, [form.loyaltyRewardId, reward, rewardApplicable, updateForm]);
 
   function changeQuantity(id, delta) {
     const current = cart[id] || 0;
@@ -101,6 +101,14 @@ export default function OrderPage() {
       {/* ═══ RÉCAP XL ═══ */}
       <section className="order-section order-section-summary">
         <div className="pbg-page-shell">
+          <img
+            className="order-delivery-art"
+            src="/assets/brand/delivery-scooter.png"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+          />
           <Reveal className="order-mini-head">
             <p className="order-mini-kicker">Commande · Étape 1 sur 2</p>
             <h1 className="order-mini-title">Ta sélection.</h1>
@@ -152,12 +160,13 @@ export default function OrderPage() {
               <div className="order-add-list">
                 <p className="order-add-list-title">+ Ajouter à la commande</p>
                 <div className="order-add-list-chips">
-                  {menu.filter((item) => item.available && !cart[item.id]).map((item) => (
-                    <button key={item.id} type="button" onClick={() => changeQuantity(item.id, 1)}>
-                      <Plus size={12} strokeWidth={2.5} />
-                      <span>{item.title}</span>
-                    </button>
-                  ))}
+                    {menu.filter((item) => item.available && !cart[item.id]).map((item) => (
+                      <button key={item.id} type="button" onClick={() => changeQuantity(item.id, 1)}>
+                        <Plus size={12} strokeWidth={2.5} />
+                        <span>{item.title}</span>
+                        <strong>{formatDzd(item.priceCents)}</strong>
+                      </button>
+                    ))}
                 </div>
               </div>
             )}
@@ -169,7 +178,7 @@ export default function OrderPage() {
                     type="checkbox"
                     checked={Boolean(form.loyaltyRewardId)}
                     onChange={(event) => updateForm("loyaltyRewardId", event.target.checked ? reward.id : "")}
-                    disabled={eligibleIds.length > 0 && eligibleSubtotal === 0}
+                    disabled={!rewardApplicable}
                   />
                   <span className="pbg-reward-body">
                     <span className="pbg-reward-badge">
@@ -178,10 +187,12 @@ export default function OrderPage() {
                     <span className="pbg-reward-text">
                       <strong>🎁 {reward.title}</strong>
                       <small>
-                        {eligibleIds.length > 0 && eligibleSubtotal === 0
-                          ? `Ajoutez ${eligibleTitles.length ? eligibleTitles.join(" ou ") : "un plat éligible"} pour activer votre remise`
+                        {missingPackTitles.length > 0
+                          ? `Ajoutez ${missingPackTitles.join(" et ")} pour compléter le pack`
+                          : eligibleIds.length > 0 && eligibleSubtotal === 0
+                            ? `Ajoutez ${eligibleTitles.length ? eligibleTitles.join(" ou ") : "un plat éligible"} pour activer votre remise`
                           : form.loyaltyRewardId
-                            ? `Vous économisez ${formatDzd(discount)}${eligibleIds.length ? ` sur ${eligibleTitles.join(", ")}` : " sur cette commande"}`
+                            ? `${rewardCalculationLabel(eligibleSubtotal, reward.rewardType, reward.rewardValue, formatDzd)}${eligibleIds.length ? ` sur ${eligibleTitles.join(", ")}` : " sur le sous-total"}`
                             : eligibleIds.length
                               ? `Remise appliquée uniquement sur : ${eligibleTitles.join(", ")}`
                               : "Cochez pour appliquer votre récompense fidélité"}

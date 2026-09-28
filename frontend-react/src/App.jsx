@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import TableModeBanner from "@/components/TableModeBanner";
@@ -56,7 +56,6 @@ function ClientSite() {
               <Route path="/menu/:slug" element={<DishPage />} />
               <Route path="/commande" element={<OrderPage />} />
               <Route path="/commande/coordonnees" element={<CheckoutContactPage />} />
-              <Route path="/reservation" element={<Navigate to="/commande" replace />} />
               <Route path="/pasta-lover-club" element={<PastaLoverClubPage />} />
               <Route path="/compte" element={<AccountPage />} />
               <Route path="/compte/profil" element={<AccountProfilePage />} />

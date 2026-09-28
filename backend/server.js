@@ -22,9 +22,11 @@ import {
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
 const reactDistDir = join(rootDir, "frontend-react", "dist");
-const databasePath = join(rootDir, "backend", "data", "galatee.sqlite");
+// GALATEE_DB_PATH permet de pointer sur une base isolee : tests E2E, staging,
+// migration one-shot. Non defini = base de developpement locale par defaut.
+const databasePath = process.env.GALATEE_DB_PATH || join(rootDir, "backend", "data", "galatee.sqlite");
 const legacyJsonPath = join(rootDir, "backend", "data", "reservations.json");
-const menuUploadDir = join(rootDir, "backend", "data", "uploads", "menu");
+const menuUploadDir = process.env.GALATEE_UPLOAD_DIR || join(rootDir, "backend", "data", "uploads", "menu");
 const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
 const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";

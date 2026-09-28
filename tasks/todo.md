@@ -1006,3 +1006,8 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [ ] Swap rate limiter et idempotency store vers Redis (meme interface).
 - [ ] Migration SQLite -> PostgreSQL avec plan de dump/replay.
 - [ ] Deploiement Hostinger : reverse proxy + PM2/systemd + secrets hors Git + backups.
+
+
+## Runbook production (2026-09-28)
+- [x] RUNBOOK.md ajoute a la racine : variables d env, CORS, Brevo, systemd, sauvegarde/restauration SQLite + procedure Postgres, rollback applicatif et donnees, checklist post-deploiement 10 points.
+- [x] DEPLOY.md pointe sur RUNBOOK.md pour la production complete, garde le setup local + Vercel.

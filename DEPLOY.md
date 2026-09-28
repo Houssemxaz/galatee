@@ -1,5 +1,7 @@
 # Presentation Vercel + backend local
 
+> **Pour la production complete (variables, migration Postgres, backups, CORS, Brevo, rollback, checklist post-deploy) : voir [`RUNBOOK.md`](./RUNBOOK.md).** Ce fichier reste le guide de setup local + presentation Vercel.
+
 Le frontend et les mockups sont deployes depuis `frontend-react`. SQLite reste local dans le serveur Node.
 
 1. Installer Node 24+, puis `npm install` a la racine du projet.

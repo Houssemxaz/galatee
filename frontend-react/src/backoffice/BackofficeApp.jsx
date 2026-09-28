@@ -1,14 +1,19 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import Sidebar from "./layout/Sidebar.jsx";
 import Topbar from "./layout/Topbar.jsx";
 import CommandPalette from "./layout/CommandPalette.jsx";
-import MenuSection from "./menu/MenuSection.jsx";
-import AnalyticsSection from "./analytics/AnalyticsSection.jsx";
 import OrdersPage from "./orders/OrdersPage.jsx";
-import LoyaltyPage from "./loyalty/LoyaltyPage.jsx";
-import ClubPage from "./club/ClubPage.jsx";
-import DeliveryPage from "./delivery/DeliveryPage.jsx";
-import DriversPage from "./drivers/DriversPage.jsx";
+
+// Code-splitting : seule OrdersPage (section par defaut) reste eager pour
+// eviter un flash au chargement du back-office. Les autres sections chargent
+// leur bundle a la volee au premier clic. Recharts (~120 kB) est isole dans
+// le chunk analytics, react-day-picker (~60 kB) dans delivery, etc.
+const MenuSection = lazy(() => import("./menu/MenuSection.jsx"));
+const AnalyticsSection = lazy(() => import("./analytics/AnalyticsSection.jsx"));
+const LoyaltyPage = lazy(() => import("./loyalty/LoyaltyPage.jsx"));
+const ClubPage = lazy(() => import("./club/ClubPage.jsx"));
+const DeliveryPage = lazy(() => import("./delivery/DeliveryPage.jsx"));
+const DriversPage = lazy(() => import("./drivers/DriversPage.jsx"));
 
 const SECTIONS = {
   orders: { label: "Commandes", render: () => <OrdersPage /> },
@@ -19,6 +24,14 @@ const SECTIONS = {
   delivery: { label: "Livraison", render: () => <DeliveryPage /> },
   drivers: { label: "Livreurs", render: () => <DriversPage /> },
 };
+
+function SectionFallback({ label }) {
+  return (
+    <div className="bo-section-loading" role="status" aria-live="polite">
+      Chargement de la section {label}…
+    </div>
+  );
+}
 
 // Linear-style: `g` puis lettre → naviguer.
 const G_SHORTCUTS = {
@@ -75,7 +88,9 @@ export default function BackofficeApp() {
         <Topbar sectionLabel={SECTIONS[active].label} />
         <main className="bo-main">
           <div className="bo-view">
-            {SECTIONS[active].render()}
+            <Suspense fallback={<SectionFallback label={SECTIONS[active].label} />}>
+              {SECTIONS[active].render()}
+            </Suspense>
           </div>
         </main>
       </div>

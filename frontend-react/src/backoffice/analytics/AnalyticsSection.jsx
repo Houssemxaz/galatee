@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { LineChart, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest, apiMessage } from "../api";
 import DateRangeFilter, { defaultRange } from "../shared/DateRangeFilter.jsx";
 import FunnelSummary from "./FunnelSummary.jsx";
-import AnalyticsChart from "./AnalyticsChart.jsx";
-import ProductPerformance from "./ProductPerformance.jsx";
+// Recharts (~200 kB minifie) est isole dans son propre chunk : il ne charge
+// qu au premier rendu des graphes, pas au premier clic sur "Statistiques".
+const AnalyticsChart = lazy(() => import("./AnalyticsChart.jsx"));
+const ProductPerformance = lazy(() => import("./ProductPerformance.jsx"));
+
+function ChartFallback() {
+  return <div className="bo-chart-loading" aria-hidden="true" style={{ minHeight: 240 }} />;
+}
 
 export default function AnalyticsSection({ token }) {
   const [range, setRange] = useState(defaultRange());
@@ -91,7 +97,9 @@ export default function AnalyticsSection({ token }) {
               </div>
               <span className="bo-stats-section-badge"><LineChart size={12} /> {groupBy === "day" ? "Jour" : groupBy === "week" ? "Semaine" : groupBy === "month" ? "Mois" : "Année"}</span>
             </div>
-            <AnalyticsChart series={dashboard.series} />
+            <Suspense fallback={<ChartFallback />}>
+              <AnalyticsChart series={dashboard.series} />
+            </Suspense>
           </section>
 
           <section className="bo-stats-section">
@@ -104,7 +112,9 @@ export default function AnalyticsSection({ token }) {
                 </p>
               </div>
             </div>
-            <ProductPerformance products={dashboard.products} />
+            <Suspense fallback={<ChartFallback />}>
+              <ProductPerformance products={dashboard.products} />
+            </Suspense>
           </section>
         </>
       )}

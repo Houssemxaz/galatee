@@ -1,28 +1,39 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import TableModeBanner from "@/components/TableModeBanner";
 import FloatingOrderCTA from "@/components/FloatingOrderCTA";
+// Chemin critique de la commande : garde eager pour eviter tout flash.
 import HomePage from "@/pages/HomePage";
 import MenuPage from "@/pages/MenuPage";
-import DishPage from "@/pages/DishPage";
 import OrderPage from "@/pages/OrderPage";
 import CheckoutContactPage from "@/pages/CheckoutContactPage";
-import InformationsPage from "@/pages/InformationsPage";
-import ContactPage from "@/pages/ContactPage";
-import NotFoundPage from "@/pages/NotFoundPage";
-import AccountPage from "@/pages/AccountPage";
-import OrdersHistoryPage from "@/pages/OrdersHistoryPage";
-import PastaLoverClubPage from "@/pages/PastaLoverClubPage";
-import TableEntryPage from "@/pages/TableEntryPage";
-import DriverApp from "@/driver/DriverApp";
+// Pages hors chemin critique : chargees a la demande. Meme regle pour
+// DriverApp (PWA livreur autonome sous /livreur/*, jamais visitee depuis
+// la home).
+const DishPage = lazy(() => import("@/pages/DishPage"));
+const InformationsPage = lazy(() => import("@/pages/InformationsPage"));
+const ContactPage = lazy(() => import("@/pages/ContactPage"));
+const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
+const AccountPage = lazy(() => import("@/pages/AccountPage"));
+const OrdersHistoryPage = lazy(() => import("@/pages/OrdersHistoryPage"));
+const PastaLoverClubPage = lazy(() => import("@/pages/PastaLoverClubPage"));
+const TableEntryPage = lazy(() => import("@/pages/TableEntryPage"));
+const DriverApp = lazy(() => import("@/driver/DriverApp"));
 import { CustomerAuthProvider } from "@/context/CustomerAuthContext";
 import { TableModeProvider } from "@/context/TableModeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { CartProvider } from "@/context/CartContext";
 import { CheckoutFormProvider } from "@/context/CheckoutFormContext";
 import { trackEvent } from "@/lib/api";
+
+// Fallback discret pendant le chargement d un chunk de page. Volontairement
+// silencieux visuellement : la plupart des chargements sont sub-seconde apres
+// la premiere fois (le service worker + le cache HTTP servent instantanement).
+function RouteFallback() {
+  return <div aria-hidden="true" style={{ minHeight: "60vh" }} />;
+}
 
 function PageViewTracker() {
   const location = useLocation();
@@ -46,21 +57,23 @@ function ClientSite() {
           <SiteHeader />
           <TableModeBanner />
           <main id="main-content">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/table" element={<TableEntryPage />} />
-              <Route path="/menu" element={<MenuPage />} />
-              <Route path="/menu/:slug" element={<DishPage />} />
-              <Route path="/commande" element={<OrderPage />} />
-              <Route path="/commande/coordonnees" element={<CheckoutContactPage />} />
-              <Route path="/reservation" element={<Navigate to="/commande" replace />} />
-              <Route path="/pasta-lover-club" element={<PastaLoverClubPage />} />
-              <Route path="/compte" element={<AccountPage />} />
-              <Route path="/compte/commandes" element={<OrdersHistoryPage />} />
-              <Route path="/informations" element={<InformationsPage />} />
-              <Route path="/contact" element={<ContactPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/table" element={<TableEntryPage />} />
+                <Route path="/menu" element={<MenuPage />} />
+                <Route path="/menu/:slug" element={<DishPage />} />
+                <Route path="/commande" element={<OrderPage />} />
+                <Route path="/commande/coordonnees" element={<CheckoutContactPage />} />
+                <Route path="/reservation" element={<Navigate to="/commande" replace />} />
+                <Route path="/pasta-lover-club" element={<PastaLoverClubPage />} />
+                <Route path="/compte" element={<AccountPage />} />
+                <Route path="/compte/commandes" element={<OrdersHistoryPage />} />
+                <Route path="/informations" element={<InformationsPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
           </main>
           <SiteFooter />
           <FloatingOrderCTA />
@@ -75,9 +88,11 @@ function ClientSite() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/livreur/*" element={<DriverApp />} />
-      <Route path="/*" element={<ClientSite />} />
-    </Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/livreur/*" element={<DriverApp />} />
+        <Route path="/*" element={<ClientSite />} />
+      </Routes>
+    </Suspense>
   );
 }

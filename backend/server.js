@@ -743,6 +743,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   createApp().listen(port, () => {
+    console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
     console.log(`Galatee reservation server listening on http://localhost:${port}`);
   });
 }

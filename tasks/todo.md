@@ -1008,4 +1008,4 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Ajouter une compatibilité de persistance PostgreSQL pour les modules synchrones existants
 - [x] Activer PostgreSQL uniquement avec `GALATEE_DATABASE=postgres` et conserver SQLite par défaut en local
 - [x] Tester la traduction des placeholders, des transactions et des introspections de schéma
-- [ ] Vérifier le démarrage, les tests et le build sans modifier les données SQLite historiques
+- [x] Vérifier le démarrage PostgreSQL, l'API menu et le build sans modifier les données SQLite historiques

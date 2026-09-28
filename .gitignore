@@ -25,3 +25,8 @@ tmp/
 output/
 .artifact-fonts/
 *artifact-fonts*
+
+# Playwright E2E outputs
+playwright-report/
+test-results/
+playwright/.cache/

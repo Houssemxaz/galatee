@@ -988,3 +988,21 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Ajouter une page back-office dédiée aux communes et tarifs de livraison
 - [x] Ajouter la navigation et connecter la page aux routes API existantes
 - [x] Vérifier les tests backend et le build frontend
+
+
+## Production hardening backend (2026-09-27)
+- [x] Auth admin : token requis en prod (refus de boot si absent), comparaison a temps constant.
+- [x] CORS : origine unique obligatoire en prod, credentials + Vary Origin, preflight OK.
+- [x] Rate limiting en memoire (429 + Retry-After) sur auth client/livreur, orders, analytics, upload, admin. Configurable via RL_*_WINDOW_MS / RL_*_MAX.
+- [x] Headers de securite sur toutes les reponses (nosniff, DENY iframe, Referrer-Policy, Permissions-Policy, HSTS en HTTPS prod).
+- [x] Identite client protegee sur POST /api/orders (session > body).
+- [x] Idempotency-Key optionnelle sur POST /api/orders (memoire, TTL 10 min).
+- [x] Health checks /health/live + /health/ready.
+- [x] Arret propre SIGTERM/SIGINT (ferme HTTP puis SQLite, timeout dur 10 s).
+- [x] Logs JSON structures avec requestId + redaction des champs sensibles.
+- [x] .env.example et DEPLOY.md a jour.
+
+## Etapes suivantes (non incluses dans cette baseline)
+- [ ] Swap rate limiter et idempotency store vers Redis (meme interface).
+- [ ] Migration SQLite -> PostgreSQL avec plan de dump/replay.
+- [ ] Deploiement Hostinger : reverse proxy + PM2/systemd + secrets hors Git + backups.

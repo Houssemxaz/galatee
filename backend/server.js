@@ -18,6 +18,7 @@ import {
   ReservationSystem,
   SqliteReservationStore,
 } from "./reservationSystem.js";
+import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
@@ -28,9 +29,13 @@ const menuUploadDir = join(rootDir, "backend", "data", "uploads", "menu");
 const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
 const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";
+const usePostgres = (process.env.GALATEE_DATABASE || "sqlite").toLowerCase() === "postgres";
+const runtimeDatabase = usePostgres
+  ? new PostgresSyncDatabase({ connectionString: process.env.DATABASE_URL })
+  : null;
 
 const reservationSystem = new ReservationSystem({
-  store: new SqliteReservationStore({ databasePath, legacyJsonPath }),
+  store: new SqliteReservationStore({ db: runtimeDatabase, databasePath, legacyJsonPath }),
 });
 const menuSystem = new MenuSystem({ db: reservationSystem.store.db, uploadRoot: menuUploadDir });
 const loyaltySystem = new LoyaltySystem({ db: reservationSystem.store.db });

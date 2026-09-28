@@ -1,7 +1,7 @@
 # Migration PostgreSQL Galatee
 
-Cette première étape prépare PostgreSQL sans modifier le runtime : le serveur
-continue à utiliser SQLite tant que l'adaptateur PostgreSQL n'a pas été revu.
+Le serveur continue à utiliser SQLite par défaut. PostgreSQL s'active
+explicitement après import et validation de la base.
 
 ## Vérifier la source SQLite
 
@@ -42,9 +42,27 @@ $env:SQLITE_DATABASE_PATH = "C:\chemin\vers\galatee.sqlite"
 Ne jamais versionner le fichier SQLite, son WAL, les exports, les mots de passe
 ou `DATABASE_URL`.
 
+## Activer PostgreSQL dans le runtime
+
+Après avoir importé la base et vérifié les compteurs :
+
+```powershell
+$env:GALATEE_DATABASE = "postgres"
+$env:DATABASE_URL = "postgresql://galatee:mot-de-passe@hote:5432/galatee"
+npm start
+```
+
+L'adaptateur de compatibilité exécute les requêtes PostgreSQL dans un worker
+dédié afin de préserver temporairement les contrats synchrones des modules
+existants. SQLite reste le mode recommandé pour le développement local.
+
+Ce mode est adapté à la validation et au lancement initial à faible trafic.
+Avant une montée en charge importante, les modules métier devront être
+convertis vers des appels PostgreSQL asynchrones afin d'éviter de sérialiser
+les requêtes.
+
 ## Suite prévue
 
-Cette migration est un outil de préparation. L'application ne doit être
-basculée vers PostgreSQL qu'après ajout d'un adaptateur de persistance, des
-migrations CI/staging, des sauvegardes restaurables et une validation complète
-des commandes, comptes, fidélité, livraison, livreurs et back-office.
+La base PostgreSQL doit encore être protégée par des sauvegardes restaurables,
+des migrations CI/staging et une validation complète des commandes, comptes,
+fidélité, livraison, livreurs et back-office avant le déploiement final.

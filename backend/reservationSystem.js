@@ -87,16 +87,18 @@ export class ReservationError extends Error {
 }
 
 export class SqliteReservationStore {
-  constructor({ databasePath = ":memory:", legacyJsonPath = null, services = DEFAULT_SERVICES, tables = DEFAULT_TABLES } = {}) {
-    if (databasePath !== ":memory:") {
+  constructor({ databasePath = ":memory:", db = null, legacyJsonPath = null, services = DEFAULT_SERVICES, tables = DEFAULT_TABLES } = {}) {
+    if (!db && databasePath !== ":memory:") {
       mkdirSync(dirname(databasePath), { recursive: true });
     }
 
-    this.db = new DatabaseSync(databasePath);
-    this.db.exec("PRAGMA foreign_keys = ON");
-    this.db.exec("PRAGMA busy_timeout = 5000");
-    if (databasePath !== ":memory:") {
-      this.db.exec("PRAGMA journal_mode = WAL");
+    this.db = db || new DatabaseSync(databasePath);
+    if (!db) {
+      this.db.exec("PRAGMA foreign_keys = ON");
+      this.db.exec("PRAGMA busy_timeout = 5000");
+      if (databasePath !== ":memory:") {
+        this.db.exec("PRAGMA journal_mode = WAL");
+      }
     }
     this.initializeSchema();
     this.seedServices(services);

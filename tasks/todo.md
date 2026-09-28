@@ -1003,3 +1003,9 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Ajouter un import transactionnel vers une base PostgreSQL neuve avec contrôle des colonnes et compteurs
 - [x] Ajouter les commandes, tests et documentation sans basculer encore le runtime applicatif
 - [ ] Ajouter l'adaptateur runtime PostgreSQL après revue de la branche de sécurisation
+
+## Adaptateur runtime PostgreSQL (2026-09-28)
+- [x] Ajouter une compatibilité de persistance PostgreSQL pour les modules synchrones existants
+- [x] Activer PostgreSQL uniquement avec `GALATEE_DATABASE=postgres` et conserver SQLite par défaut en local
+- [x] Tester la traduction des placeholders, des transactions et des introspections de schéma
+- [ ] Vérifier le démarrage, les tests et le build sans modifier les données SQLite historiques

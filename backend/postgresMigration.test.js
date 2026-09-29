@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MIGRATION_TABLES, assertCounts, buildInsertStatement } from "./postgres/migrate.mjs";
+import {
+  MIGRATION_TABLES,
+  OPTIONAL_LEGACY_TABLES,
+  assertCounts,
+  buildInsertStatement,
+} from "./postgres/migrate.mjs";
 
 test("PostgreSQL migration manifest contains every current application table once", () => {
   assert.equal(new Set(MIGRATION_TABLES).size, MIGRATION_TABLES.length);
@@ -9,6 +14,12 @@ test("PostgreSQL migration manifest contains every current application table onc
   assert.ok(MIGRATION_TABLES.includes("menu_item_revisions"));
   assert.ok(MIGRATION_TABLES.includes("reservations"));
   assert.ok(!MIGRATION_TABLES.includes("sqlite_sequence"));
+});
+
+test("legacy reservation tables are optional in the current SQLite source", () => {
+  assert.ok(OPTIONAL_LEGACY_TABLES.has("reservations"));
+  assert.ok(OPTIONAL_LEGACY_TABLES.has("availability_events"));
+  assert.ok(!OPTIONAL_LEGACY_TABLES.has("orders"));
 });
 
 test("PostgreSQL insert statements quote fixed identifiers and remain idempotent", () => {
@@ -22,10 +33,30 @@ test("PostgreSQL insert statements quote fixed identifiers and remain idempotent
 
 test("PostgreSQL migration count verification detects missing rows", () => {
   const snapshot = {
-    tables: new Map(MIGRATION_TABLES.map((table) => [table, { rows: table === "orders" ? [{ id: "one" }] : [] }])),
+    tables: new Map(
+      MIGRATION_TABLES.map((table) => [
+        table,
+        { rows: table === "orders" ? [{ id: "one" }] : [], sourcePresent: true },
+      ]),
+    ),
   };
   const complete = Object.fromEntries(MIGRATION_TABLES.map((table) => [table, table === "orders" ? 1 : 0]));
   assert.doesNotThrow(() => assertCounts(snapshot, complete));
   assert.throws(() => assertCounts(snapshot, { ...complete, orders: 0 }), /orders/);
   assert.doesNotThrow(() => assertCounts(snapshot, { ...complete, orders: 2 }, { allowExisting: true }));
+});
+
+test("PostgreSQL count verification ignores absent legacy source tables", () => {
+  const snapshot = {
+    tables: new Map(
+      MIGRATION_TABLES.map((table) => [
+        table,
+        table === "reservations"
+          ? { rows: [], columns: [], sourcePresent: false }
+          : { rows: [], sourcePresent: true },
+      ]),
+    ),
+  };
+  const targetCounts = Object.fromEntries(MIGRATION_TABLES.map((table) => [table, table === "reservations" ? 12 : 0]));
+  assert.doesNotThrow(() => assertCounts(snapshot, targetCounts));
 });

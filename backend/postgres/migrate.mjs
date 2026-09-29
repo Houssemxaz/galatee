@@ -43,6 +43,20 @@ export const MIGRATION_TABLES = [
   "driver_push_subscriptions",
 ];
 
+// These reservation tables are kept in the PostgreSQL schema for historical
+// compatibility, but the current SQLite application no longer creates them.
+// An absent table in the source must be skipped, never fabricated or deleted.
+export const OPTIONAL_LEGACY_TABLES = new Set([
+  "services",
+  "restaurant_tables",
+  "reservations",
+  "blocked_time_slots",
+  "reservation_table_assignments",
+  "availability_settings",
+  "availability_settings_history",
+  "availability_events",
+]);
+
 const VERSION = "001_sqlite_baseline";
 
 /**
@@ -67,11 +81,17 @@ export function readSqliteSnapshot(sqlitePath = defaultSqlitePath) {
     let rowCount = 0;
     for (const table of MIGRATION_TABLES) {
       const columns = db.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all();
-      if (columns.length === 0) throw new Error(`SQLite table is missing: ${table}`);
+      if (columns.length === 0) {
+        if (!OPTIONAL_LEGACY_TABLES.has(table)) {
+          throw new Error(`SQLite table is missing: ${table}`);
+        }
+        tables.set(table, { columns: [], rows: [], sourcePresent: false });
+        continue;
+      }
       const columnNames = columns.map((column) => column.name);
       const selectList = columnNames.map(quoteIdentifier).join(", ");
       const rows = db.prepare(`SELECT ${selectList} FROM ${quoteIdentifier(table)}`).all();
-      tables.set(table, { columns: columnNames, rows });
+      tables.set(table, { columns: columnNames, rows, sourcePresent: true });
       rowCount += rows.length;
     }
 
@@ -129,6 +149,10 @@ export async function applyMigration({
     let insertedRows = 0;
     for (const table of MIGRATION_TABLES) {
       const tableSnapshot = snapshot.tables.get(table);
+      if (tableSnapshot.sourcePresent === false) {
+        logger.info?.(`[postgres] ${table}: skipped (not present in SQLite source)`);
+        continue;
+      }
       const insert = buildInsertStatement(table, tableSnapshot.columns);
       for (const row of tableSnapshot.rows) {
         const values = tableSnapshot.columns.map((column) => row[column] ?? null);
@@ -166,7 +190,9 @@ export async function applyMigration({
 
 export function assertCounts(snapshot, targetCounts, { allowExisting = false } = {}) {
   for (const table of MIGRATION_TABLES) {
-    const expected = snapshot.tables.get(table).rows.length;
+    const tableSnapshot = snapshot.tables.get(table);
+    if (tableSnapshot.sourcePresent === false) continue;
+    const expected = tableSnapshot.rows.length;
     const actual = Number(targetCounts[table] || 0);
     if (allowExisting ? actual < expected : actual !== expected) {
       throw new Error(
@@ -178,6 +204,7 @@ export function assertCounts(snapshot, targetCounts, { allowExisting = false } =
 
 async function assertTargetColumns(client, snapshot) {
   for (const table of MIGRATION_TABLES) {
+    if (snapshot.tables.get(table).sourcePresent === false) continue;
     const result = await client.query(
       `SELECT column_name
        FROM information_schema.columns

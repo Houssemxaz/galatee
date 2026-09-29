@@ -16,6 +16,7 @@ import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
 import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
 import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
+import { createClient } from "redis";
 import {
   applyCorsHeaders as applyCorsHeadersImpl,
   applySecurityHeaders,
@@ -28,8 +29,8 @@ import {
   resolveCorsOrigin,
   safeTokenCompare,
 } from "./security.js";
-import { applyRateLimit, limiterFromEnv } from "./rateLimit.js";
-import { InMemoryIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
+import { applyRateLimit, createRedisRateLimiters, limiterFromEnv, RATE_LIMIT_DEFAULTS } from "./rateLimit.js";
+import { InMemoryIdempotencyStore, RedisIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
@@ -45,13 +46,44 @@ const runtimeDatabase = usePostgres
   : openSqliteDatabase(databasePath);
 
 const defaultRateLimiters = {
-  auth: limiterFromEnv("AUTH", { windowMs: 15 * 60 * 1000, max: 20 }),
-  order: limiterFromEnv("ORDER", { windowMs: 60 * 1000, max: 8 }),
-  analytics: limiterFromEnv("ANALYTICS", { windowMs: 60 * 1000, max: 60 }),
-  upload: limiterFromEnv("UPLOAD", { windowMs: 60 * 1000, max: 10 }),
-  admin: limiterFromEnv("ADMIN", { windowMs: 60 * 1000, max: 120 }),
+  auth: limiterFromEnv("AUTH", RATE_LIMIT_DEFAULTS.auth),
+  order: limiterFromEnv("ORDER", RATE_LIMIT_DEFAULTS.order),
+  analytics: limiterFromEnv("ANALYTICS", RATE_LIMIT_DEFAULTS.analytics),
+  upload: limiterFromEnv("UPLOAD", RATE_LIMIT_DEFAULTS.upload),
+  admin: limiterFromEnv("ADMIN", RATE_LIMIT_DEFAULTS.admin),
 };
 const defaultIdempotencyStore = new InMemoryIdempotencyStore();
+
+export function createSharedStoreRuntime({
+  redisUrl = process.env.REDIS_URL || "",
+  keyPrefix = process.env.REDIS_KEY_PREFIX || "galatee:",
+} = {}) {
+  if (!redisUrl) {
+    return {
+      mode: "memory",
+      rateLimiters: defaultRateLimiters,
+      idempotencyStore: defaultIdempotencyStore,
+      connect: async () => {},
+      close: async () => {},
+      health: async () => true,
+    };
+  }
+
+  const client = createClient({ url: redisUrl });
+  client.on("error", (error) => logger.error("shared_store.redis_error", { error: error.message }));
+  return {
+    mode: "redis",
+    rateLimiters: createRedisRateLimiters(client, { keyPrefix: `${keyPrefix}rate:` }),
+    idempotencyStore: new RedisIdempotencyStore({ client, keyPrefix: `${keyPrefix}idempotency:` }),
+    connect: async () => {
+      if (!client.isOpen) await client.connect();
+    },
+    close: async () => {
+      if (client.isOpen) await client.quit();
+    },
+    health: async () => client.isReady,
+  };
+}
 
 const menuSystem = new MenuSystem({ db: runtimeDatabase, uploadRoot: menuUploadDir });
 const loyaltySystem = new LoyaltySystem({ db: runtimeDatabase });
@@ -87,6 +119,7 @@ export function createApp({
   corsAllowedOrigin = allowedOrigin,
   rateLimiters = defaultRateLimiters,
   idempotencyStore = defaultIdempotencyStore,
+  sharedStoreHealth = async () => true,
 } = {}) {
   return createServer(async (request, response) => {
     const requestId = ensureRequestId(request);
@@ -109,14 +142,15 @@ export function createApp({
       if (url.pathname === "/health/ready" && request.method === "GET") {
         try {
           database.prepare("SELECT 1 AS ok").get();
-          return sendJson(response, 200, { status: "ok", database: "ok" });
+          if (!(await sharedStoreHealth())) throw new Error("Shared store is not ready.");
+          return sendJson(response, 200, { status: "ok", database: "ok", sharedStore: "ok" });
         } catch (error) {
           logger.error("health.ready.db_failure", { requestId, error: error.message });
           return sendJson(response, 503, { status: "unavailable", database: "unavailable" });
         }
       }
 
-      if (!enforceRateLimit(rateLimiters, url, request, response)) return;
+      if (!(await enforceRateLimit(rateLimiters, url, request, response))) return;
 
       if (url.pathname === "/api/auth/request-code" && request.method === "POST") {
         const payload = await customerAuth.requestCode(await readJsonBody(request));
@@ -190,7 +224,7 @@ export function createApp({
           : `anonymous:${resolveClientIp(request)}:${String(orderBody.phone || "").slice(0, 30)}`;
 
         if (idempotencyKey) {
-          const existing = idempotencyStore.get(scope, idempotencyKey);
+          const existing = await idempotencyStore.get(scope, idempotencyKey);
           if (existing?.status === "done") {
             return sendJson(response, 201, existing.response, { "Idempotent-Replay": "true" });
           }
@@ -202,17 +236,28 @@ export function createApp({
               },
             });
           }
-          idempotencyStore.beginOrGet(scope, idempotencyKey);
+          const reservation = await idempotencyStore.beginOrGet(scope, idempotencyKey);
+          if (!reservation.acquired) {
+            if (reservation.entry?.status === "done") {
+              return sendJson(response, 201, reservation.entry.response, { "Idempotent-Replay": "true" });
+            }
+            return sendJson(response, 409, {
+              error: {
+                code: "IDEMPOTENCY_IN_FLIGHT",
+                message: "Une commande avec cette clé est déjà en cours de traitement.",
+              },
+            });
+          }
         }
 
         try {
           const payload = {
             order: orders.createOrder(orderBody, { customerId: session?.account.id || null }),
           };
-          if (idempotencyKey) idempotencyStore.complete(scope, idempotencyKey, payload);
+          if (idempotencyKey) await idempotencyStore.complete(scope, idempotencyKey, payload);
           return sendJson(response, 201, payload);
         } catch (error) {
-          if (idempotencyKey) idempotencyStore.release(scope, idempotencyKey);
+          if (idempotencyKey) await idempotencyStore.release(scope, idempotencyKey);
           throw error;
         }
       }
@@ -655,7 +700,7 @@ function requireCustomerSession(customerAuth, request) {
   throw new CustomerAuthError("AUTH_UNAUTHORIZED", "A customer account is required.", 401);
 }
 
-function enforceRateLimit(limiters, url, request, response) {
+async function enforceRateLimit(limiters, url, request, response) {
   const { method } = request;
   const { pathname } = url;
   if (method === "POST") {
@@ -864,12 +909,29 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     );
   }
 
-  const server = createApp();
-  server.listen(port, () => {
-    logger.info("server.listen", { port, env: NODE_ENV });
-    console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
-    console.log(`Galatee order server listening on http://localhost:${port}`);
-  });
+  const sharedStores = createSharedStoreRuntime();
+  let server = null;
+  async function start() {
+    try {
+      await sharedStores.connect();
+      server = createApp({
+        rateLimiters: sharedStores.rateLimiters,
+        idempotencyStore: sharedStores.idempotencyStore,
+        sharedStoreHealth: sharedStores.health,
+      });
+      server.listen(port, () => {
+        logger.info("server.listen", { port, env: NODE_ENV, sharedStore: sharedStores.mode });
+        console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
+        console.log(`Galatee shared store mode: ${sharedStores.mode}`);
+        console.log(`Galatee order server listening on http://localhost:${port}`);
+      });
+    } catch (error) {
+      logger.error("server.start.shared_store_failure", { error: error.message, mode: sharedStores.mode });
+      try { runtimeDatabase.close?.(); } catch { /* ignore cleanup failures */ }
+      process.exit(1);
+    }
+  }
+  void start();
 
   let shuttingDown = false;
   function shutdown(signal) {
@@ -878,12 +940,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     logger.info("server.shutdown.start", { signal });
     const forceTimer = setTimeout(() => process.exit(1), 10_000);
     forceTimer.unref?.();
-    server.close(() => {
+    const finish = async () => {
+      try { await sharedStores.close(); } catch (error) { logger.warn("server.shutdown.shared_store_error", { error: error.message }); }
       try { runtimeDatabase.close?.(); } catch (error) { logger.warn("server.shutdown.database_error", { error: error.message }); }
       clearTimeout(forceTimer);
       logger.info("server.shutdown.done", { signal });
       process.exit(0);
-    });
+    };
+    if (!server) {
+      void finish();
+      return;
+    }
+    server.close(() => void finish());
   }
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));

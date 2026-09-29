@@ -1,0 +1,15 @@
+node_modules
+frontend-react/node_modules
+frontend-react/dist
+backend/data
+.git
+.github
+.claude
+playwright-report
+test-results
+output
+tmp
+*.log
+.env
+.env.*
+!.env.example

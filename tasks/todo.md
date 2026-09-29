@@ -1295,4 +1295,24 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Ajouter les headers de sécurité, CORS strict en production et les request IDs.
 - [x] Ajouter rate limiting, idempotence des commandes et health checks live/ready.
 - [x] Ajouter l'arrêt propre, les verrous de démarrage production et les tests régressifs.
+- [x] Ajouter un mode Redis partagé pour le rate limiting et l'idempotence, activé par `REDIS_URL`.
 - [ ] Remplacer les stores mémoire par Redis si plusieurs instances backend sont déployées.
+
+## Suite E2E isolée (2026-09-29)
+- [x] Ajouter Playwright et un serveur de test avec base SQLite temporaire.
+- [x] Couvrir commande client, parcours livreur et accès back-office.
+- [x] Exécuter la suite sans modifier la base locale et documenter la commande.
+
+## Préparation déploiement mono-VPS (2026-09-29)
+- [x] Ajouter un packaging Docker reproductible pour le backend et le build frontend.
+- [x] Décrire la séquence PostgreSQL, sauvegarde, vérification et rollback sans secrets committés.
+- [x] Vérifier la configuration générée et documenter ce qui devra être exécuté sur le VPS.
+- [x] Ajouter un contrôle local des variables de production avant démarrage Docker.
+- [x] Auditer les dépendances runtime: aucune vulnérabilité élevée ou critique détectée.
+- [x] Corriger et auditer les dépendances frontend: aucune vulnérabilité restante.
+- [x] Vérifier statiquement la configuration Docker Compose sans démarrer de conteneurs.
+- [x] Construire et démarrer l'image Docker localement avec un fichier `.env.production` de test non sensible.
+- [x] Tester localement PostgreSQL Docker, la migration, le health check ready et une restauration de sauvegarde.
+- [x] Tester le profil Redis partagé et le health check `sharedStore=redis`.
+- [x] Faire la revue finale de release: secrets, logs, uploads persistants, rollback et checklist client.
+- [ ] Acheter et initialiser le VPS, puis exécuter la migration sur une base PostgreSQL de production.

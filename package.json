@@ -13,14 +13,23 @@
     "db:postgres:import": "node backend/postgres/migrate.mjs --apply",
     "db:postgres:reservations-preview": "node backend/postgres/archiveReservations.mjs",
     "db:postgres:reservations-remove": "node backend/postgres/archiveReservations.mjs --apply",
+    "predeploy:check": "node deploy/check-production-config.mjs",
     "db:sqlite:reservations-remove": "node backend/archiveSqliteReservations.mjs",
-    "test": "node --test backend/*.test.js"
+    "test": "node --test backend/*.test.js",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:only": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install chromium"
   },
   "engines": {
     "node": ">=24"
   },
   "dependencies": {
     "pg": "^8.16.3",
+    "redis": "^5.12.1",
     "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

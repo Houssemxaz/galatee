@@ -1285,3 +1285,8 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Remplacer les surfaces olive trop profondes par les tokens de la PWA livreur.
 - [x] Conserver les accents tomate/dore et vérifier le contraste des composants.
 - [x] Recompiler, tester et contrôler le rendu desktop.
+
+## Code splitting contrôlé (2026-09-29)
+- [x] Lazy-loader les pages secondaires du site et la PWA livreur.
+- [x] Lazy-loader les sections secondaires du back-office et les graphiques analytics.
+- [x] Conserver toutes les routes compte existantes et vérifier tests/build.

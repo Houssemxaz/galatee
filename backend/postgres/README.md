@@ -3,6 +3,11 @@
 Le serveur continue à utiliser SQLite par défaut. PostgreSQL s'active
 explicitement après import et validation de la base.
 
+Le back-office et la page Statistiques utilisent le même adaptateur que les
+commandes, le menu et les comptes. En production, le serveur refuse de
+démarrer en SQLite : `GALATEE_DATABASE=postgres` et `DATABASE_URL` doivent
+être configurés avant le lancement.
+
 ## Vérifier la source SQLite
 
 Depuis la racine du dépôt :

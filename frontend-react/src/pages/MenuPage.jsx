@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, PackageX } from "lucide-react";
+import { ArrowUpRight, PackageX, Tag } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import DishImage from "@/components/DishImage";
 import SEO from "@/components/SEO";
 import { fetchMenu, categories, trackEvent } from "@/lib/api";
 import { formatDzd } from "@/lib/formatters";
+import { getBestPromotion } from "@/lib/promotions";
 
 export default function MenuPage() {
   const [dishes, setDishes] = useState([]);
@@ -26,6 +27,7 @@ export default function MenuPage() {
     () => (category === "all" ? dishes : dishes.filter((d) => d.category === category)),
     [category, dishes],
   );
+  const directPromotions = dishes.promotions || [];
   const menuJsonLd = dishes.length > 0 ? {
     "@context": "https://schema.org",
     "@type": "Menu",
@@ -100,6 +102,14 @@ export default function MenuPage() {
                   className="pbg-dish-card pbg-dish-card-anim"
                   style={{ "--stagger": `${index * 60}ms` }}
                 >
+                  {(() => {
+                    const promotion = getBestPromotion([
+                      { id: dish.id, quantity: 1, lineTotal: dish.priceCents },
+                    ], directPromotions);
+                    return promotion ? (
+                      <span className="pbg-dish-card-promo"><Tag size={12} strokeWidth={1.8} />−{promotion.rewardValue}{promotion.rewardType === "percentage" ? "%" : " DA"}</span>
+                    ) : null;
+                  })()}
                   <div className="pbg-dish-card-media">
                     <DishImage dish={dish} sizes="(max-width: 720px) 100vw, (max-width: 1200px) 50vw, 33vw" />
                   </div>

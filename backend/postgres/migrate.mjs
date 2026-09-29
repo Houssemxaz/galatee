@@ -32,6 +32,7 @@ export const MIGRATION_TABLES = [
   "order_status_history",
   "loyalty_settings",
   "loyalty_rewards",
+  "promotions",
   "analytics_events",
   "daily_revenues",
   "pasta_club_settings",

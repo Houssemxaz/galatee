@@ -38,12 +38,13 @@ export class OrderError extends Error {
 }
 
 export class OrderSystem {
-  constructor({ db, menu, loyalty = null, now = () => new Date() } = {}) {
+  constructor({ db, menu, loyalty = null, promotions = null, now = () => new Date() } = {}) {
     if (!db) throw new Error("OrderSystem requires a SQLite database.");
     if (!menu) throw new Error("OrderSystem requires a MenuSystem.");
     this.db = db;
     this.menu = menu;
     this.loyalty = loyalty;
+    this.promotions = promotions;
     this.now = now;
     this.initializeSchema();
     this.seedCommunes();
@@ -77,6 +78,9 @@ export class OrderSystem {
         note TEXT NOT NULL DEFAULT '',
         subtotal_cents INTEGER NOT NULL CHECK (subtotal_cents >= 0),
         delivery_fee_cents INTEGER NOT NULL CHECK (delivery_fee_cents >= 0),
+        discount_cents INTEGER NOT NULL DEFAULT 0 CHECK (discount_cents >= 0),
+        loyalty_reward_id TEXT,
+        promotion_id TEXT,
         total_cents INTEGER NOT NULL CHECK (total_cents >= 0),
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
@@ -115,6 +119,9 @@ export class OrderSystem {
     }
     if (!orderColumns.some((column) => column.name === "loyalty_reward_id")) {
       this.db.exec("ALTER TABLE orders ADD COLUMN loyalty_reward_id TEXT");
+    }
+    if (!orderColumns.some((column) => column.name === "promotion_id")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN promotion_id TEXT");
     }
     // Champs livreur : assignation manuelle depuis le backoffice puis suivi
     // du parcours de livraison (en route, livree).
@@ -230,7 +237,12 @@ export class OrderSystem {
     if (normalized.loyaltyRewardId && !reward) {
       throw new OrderError("LOYALTY_REWARD_UNAVAILABLE", "This loyalty reward is no longer available.", 409);
     }
-    const discountCents = reward?.discountCents || 0;
+    const promotion = this.promotions?.previewBest(items) || null;
+    const rewardDiscountCents = reward?.discountCents || 0;
+    const promotionDiscountCents = promotion?.discountCents || 0;
+    const appliedPromotion = promotion && promotionDiscountCents >= rewardDiscountCents ? promotion : null;
+    const appliedReward = appliedPromotion ? null : reward;
+    const discountCents = appliedPromotion?.discountCents || appliedReward?.discountCents || 0;
     const timestamp = this.now().toISOString();
     const order = {
       id: randomUUID(),
@@ -243,7 +255,8 @@ export class OrderSystem {
       subtotalCents,
       deliveryFeeCents,
       discountCents,
-      loyaltyRewardId: reward?.id || null,
+      loyaltyRewardId: appliedReward?.id || null,
+      promotionId: appliedPromotion?.id || null,
       totalCents: Math.max(0, subtotalCents + deliveryFeeCents - discountCents),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -255,13 +268,13 @@ export class OrderSystem {
         INSERT INTO orders (
           id, order_number, customer_id, first_name, last_name, phone, email,
           delivery_mode, commune_id, commune_name, delivery_address, delivery_latitude, delivery_longitude, payment_method,
-          status, note, subtotal_cents, delivery_fee_cents, discount_cents, loyalty_reward_id, total_cents, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          status, note, subtotal_cents, delivery_fee_cents, discount_cents, loyalty_reward_id, promotion_id, total_cents, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         order.id, order.orderNumber, order.customerId, order.firstName, order.lastName,
         order.phone, order.email, order.deliveryMode, order.communeId, order.communeName,
         order.deliveryAddress, order.deliveryLatitude, order.deliveryLongitude, order.paymentMethod, order.status, order.note,
-        order.subtotalCents, order.deliveryFeeCents, order.discountCents, order.loyaltyRewardId,
+        order.subtotalCents, order.deliveryFeeCents, order.discountCents, order.loyaltyRewardId, order.promotionId,
         order.totalCents, order.createdAt, order.updatedAt,
       );
       const insertItem = this.db.prepare(`
@@ -273,7 +286,7 @@ export class OrderSystem {
       }
       this.db.prepare("INSERT INTO order_status_history (order_id, status, changed_at) VALUES (?, ?, ?)")
         .run(order.id, "pending", timestamp);
-      if (reward) this.loyalty.applyReward(customerId, reward.id, subtotalCents, order.id, items);
+      if (appliedReward) this.loyalty.applyReward(customerId, appliedReward.id, subtotalCents, order.id, items);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -444,6 +457,7 @@ export class OrderSystem {
       discountCents: row.discount_cents || 0,
       discount: formatAmount(row.discount_cents || 0),
       loyaltyRewardId: row.loyalty_reward_id || null,
+      promotionId: row.promotion_id || null,
       totalCents: row.total_cents,
       total: formatAmount(row.total_cents),
       assignedDriverId: row.assigned_driver_id || null,

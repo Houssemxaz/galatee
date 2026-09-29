@@ -3,6 +3,8 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
 const DRIVER_STATUSES = new Set(["offline", "available", "busy"]);
 const SESSION_COOKIE = "galatee_driver_session";
 const SESSION_TTL_DAYS = 30;
+const DRIVER_LOGIN_MAX_FAILURES = 5;
+const DRIVER_LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
 
 export class DriverError extends Error {
   constructor(code, message, status = 400, details = {}) {
@@ -19,6 +21,7 @@ export class DriverSystem {
     if (!db) throw new Error("DriverSystem requires a SQLite database.");
     this.db = db;
     this.now = now;
+    this.loginFailures = new Map();
     this.initializeSchema();
   }
 
@@ -153,12 +156,27 @@ export class DriverSystem {
 
   loginWithPin({ phone, pin }, { userAgent = "" } = {}) {
     const normalizedPhone = normalizePhone(phone);
+    const nowMs = this.now().getTime();
+    const failure = this.loginFailures.get(normalizedPhone);
+    if (failure?.lockedUntil > nowMs) {
+      throw new DriverError(
+        "DRIVER_LOGIN_LOCKED",
+        "Trop de tentatives. Réessayez dans quelques minutes.",
+        429,
+        { retryAfterSeconds: Math.max(1, Math.ceil((failure.lockedUntil - nowMs) / 1000)) },
+      );
+    }
+    if (failure?.lockedUntil && failure.lockedUntil <= nowMs) {
+      this.loginFailures.delete(normalizedPhone);
+    }
+
     const normalizedPin = normalizePin(pin);
     const row = this.db.prepare("SELECT * FROM drivers WHERE phone = ?").get(normalizedPhone);
-    if (!row || !row.active) throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
+    if (!row || !row.active) return this.recordLoginFailure(normalizedPhone, nowMs);
     if (!verifyPin(normalizedPin, row.pin_hash, row.pin_salt)) {
-      throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
+      return this.recordLoginFailure(normalizedPhone, nowMs);
     }
+    this.loginFailures.delete(normalizedPhone);
     const sessionId = randomBytes(32).toString("hex");
     const nowDate = this.now();
     const nowIso = nowDate.toISOString();
@@ -169,6 +187,23 @@ export class DriverSystem {
     `).run(sessionId, row.id, nowIso, expiresAt, String(userAgent || "").slice(0, 200));
     this.db.prepare("UPDATE drivers SET last_seen_at = ? WHERE id = ?").run(nowIso, row.id);
     return { sessionId, driver: mapDriverRow(row), expiresAt };
+  }
+
+  recordLoginFailure(phone, nowMs) {
+    const previous = this.loginFailures.get(phone);
+    const attempts = (previous?.attempts || 0) + 1;
+    if (attempts >= DRIVER_LOGIN_MAX_FAILURES) {
+      const lockedUntil = nowMs + DRIVER_LOGIN_LOCKOUT_MS;
+      this.loginFailures.set(phone, { attempts, lockedUntil });
+      throw new DriverError(
+        "DRIVER_LOGIN_LOCKED",
+        "Trop de tentatives. Réessayez dans quelques minutes.",
+        429,
+        { retryAfterSeconds: Math.ceil(DRIVER_LOGIN_LOCKOUT_MS / 1000) },
+      );
+    }
+    this.loginFailures.set(phone, { attempts, lockedUntil: 0 });
+    throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
   }
 
   getSession(request) {

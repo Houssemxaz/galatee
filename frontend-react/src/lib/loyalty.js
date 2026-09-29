@@ -5,6 +5,18 @@ export function calculateRewardDiscountCents(amountCents, rewardType, rewardValu
   return Math.min(amount, Math.floor(amount * value / 100));
 }
 
+export function calculateRewardDiscountForLines(lines = [], rewardType, rewardValue) {
+  if (!Array.isArray(lines)) return 0;
+  return lines.reduce((sum, line) => {
+    const lineTotalCents = Math.max(0, Math.trunc(Number(line.lineTotal ?? line.lineTotalCents) || 0));
+    const quantity = Math.max(1, Math.trunc(Number(line.quantity) || 1));
+    const discount = rewardType === "fixed"
+      ? Math.min(lineTotalCents, Math.max(0, Math.trunc(Number(rewardValue) || 0)) * 100 * quantity)
+      : calculateRewardDiscountCents(lineTotalCents, rewardType, rewardValue);
+    return sum + discount;
+  }, 0);
+}
+
 export function rewardCalculationLabel(amountCents, rewardType, rewardValue, format) {
   const amount = Math.max(0, Math.trunc(Number(amountCents) || 0));
   const value = Math.max(0, Math.trunc(Number(rewardValue) || 0));

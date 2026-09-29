@@ -24,6 +24,9 @@ export function safeTokenCompare(provided, expected) {
   return timingSafeEqual(actual, target);
 }
 
+// Ne faire confiance à X-Forwarded-For que lorsqu'un reverse proxy connu est
+// explicitement déclaré. Sinon un client pourrait choisir lui-même son IP et
+// contourner les limites par adresse.
 export function resolveClientIp(request) {
   if (TRUST_PROXY > 0) {
     const forwarded = request?.headers?.["x-forwarded-for"];
@@ -98,6 +101,16 @@ export function resolveCorsOrigin(configuredOrigin) {
     throw new Error("GALATEE_ALLOWED_ORIGIN must be a specific origin in production.");
   }
   return origin || "*";
+}
+
+// Cookie-authenticated mutations must come from the configured frontend origin.
+// Requests without Origin remain compatible with server-to-server clients and tests.
+export function isAllowedMutationOrigin(request, configuredOrigin) {
+  const requestOrigin = String(request?.headers?.origin || "").trim();
+  if (!requestOrigin) return true;
+  const allowedOrigin = String(configuredOrigin || "").trim();
+  if (allowedOrigin === "*") return !IS_PRODUCTION;
+  return requestOrigin === allowedOrigin;
 }
 
 export function applyCorsHeaders(response, configuredOrigin) {

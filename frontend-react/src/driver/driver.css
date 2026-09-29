@@ -1107,6 +1107,131 @@
   .pbg-drv-bottom-nav { bottom: 24px; }
 }
 
+@media (min-width: 960px) {
+  .pbg-drv-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(360px, .88fr);
+    align-items: start;
+    gap: 24px 28px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 34px 56px 56px 292px;
+  }
+
+  .pbg-drv-shell > .pbg-drv-header,
+  .pbg-drv-shell > .pbg-drv-status-toggle,
+  .pbg-drv-shell > .pbg-drv-overview {
+    grid-column: 1 / -1;
+  }
+
+  .pbg-drv-shell > #mes-courses {
+    grid-column: 1;
+    margin-bottom: 0;
+  }
+
+  .pbg-drv-shell > #courses-disponibles {
+    grid-column: 2;
+    margin-bottom: 0;
+  }
+
+  .pbg-drv-shell:has(.pbg-drv-login) {
+    display: block;
+    max-width: 560px;
+  }
+
+  .pbg-drv-header {
+    padding: 4px 0 8px;
+  }
+
+  .pbg-drv-status-toggle {
+    margin-bottom: 0;
+  }
+
+  .pbg-drv-overview {
+    margin-bottom: 0;
+  }
+
+  .pbg-drv-bottom-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 236px;
+    padding: 24px 14px;
+    transform: none;
+    border: 0;
+    border-right: 1px solid rgba(244, 241, 232, .1);
+    border-radius: 0;
+    background: rgba(17, 20, 15, .94);
+    box-shadow: 18px 0 42px -32px rgba(0, 0, 0, .8);
+    backdrop-filter: blur(18px);
+  }
+
+  .pbg-drv-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 4px 10px 28px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--drv-hair);
+  }
+
+  .pbg-drv-nav-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: var(--drv-accent);
+    color: #fff;
+    font-family: "Antonio", sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .pbg-drv-nav-brand-copy {
+    display: grid;
+    gap: 3px;
+    color: var(--drv-ink);
+  }
+
+  .pbg-drv-nav-brand-copy strong {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .pbg-drv-nav-brand-copy small {
+    color: var(--drv-ink-muted);
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  .pbg-drv-bottom-link {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 48px;
+    padding: 5px 12px;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  .pbg-drv-bottom-link:last-child {
+    margin-top: auto;
+  }
+}
+
+.pbg-drv-nav-brand { display: none; }
+
+@media (min-width: 960px) {
+  .pbg-drv-nav-brand { display: flex; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pbg-drv-status-switch,
   .pbg-drv-status-switch > span,

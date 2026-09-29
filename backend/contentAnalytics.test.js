@@ -156,12 +156,21 @@ test("site stats reports traffic, confirmed order revenue and product performanc
   analytics.recordEvent({ eventName: "order_submitted", sessionId: "1234567890abcdef", pagePath: "/commande" });
 
   const stats = analytics.getSiteStats({ from: "2026-09-03", to: "2026-09-03", groupBy: "day" });
+  assert.equal(stats.database, "sqlite");
   assert.equal(stats.totals.siteViews, 2);
   assert.equal(stats.totals.uniqueVisitors, 2);
   assert.equal(stats.totals.orders.received, 3);
   assert.equal(stats.totals.orders.confirmed, 2);
   assert.equal(stats.totals.orders.cancelled, 1);
   assert.equal(stats.totals.orders.revenue, ((bestItem.priceCents * 2 + otherItem.priceCents) / 100).toFixed(2));
+  assert.deepEqual(stats.previousPeriod.totals.orders, {
+    received: 0,
+    confirmed: 0,
+    cancelled: 0,
+    revenueCents: 0,
+    revenue: "0.00",
+    confirmationRate: 0,
+  });
   assert.equal(stats.products.bestSelling[0].productId, bestItem.id);
   assert.equal(stats.products.leastSelling[0].productId, otherItem.id);
 });

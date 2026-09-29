@@ -1,5 +1,43 @@
 # Todo
 
+## Statistiques production et lisibilité (2026-09-29)
+- [x] Exposer et vérifier la source de données réelle de l’API statistiques.
+- [x] Verrouiller PostgreSQL en production et conserver SQLite uniquement pour le local.
+- [x] Réorganiser les graphes par usage et afficher des totaux lisibles.
+- [x] Valider le parcours réel du site, les tests et le build.
+
+## Repères des graphiques statistiques (2026-09-29)
+- [x] Ajouter les libellés X/Y et les unités sur chaque graphique.
+- [x] Clarifier la lecture du funnel et adapter l’affichage responsive.
+- [x] Valider le build après la correction.
+
+## Alignement de l'aperçu des promotions (2026-09-29)
+- [x] Autoriser plusieurs cibles en mode plat individuel avec une remise par ligne.
+- [x] Afficher un aperçu par plat en individuel et un aperçu global en pack.
+- [x] Aligner la validation serveur et les tests sur les deux modes.
+- [x] Valider `npm test` et `npm run build`.
+
+## Promotions indépendantes de la fidélité (2026-09-29)
+- [x] Ajouter un système persistant de promotions par plat ou par pack, avec une valeur propre à chaque règle.
+- [x] Exposer les promotions publiques et appliquer automatiquement la meilleure remise au panier et côté serveur.
+- [x] Ajouter un onglet back-office Promotions séparé de Fidélité.
+- [x] Ajouter les tests de calcul, de persistance et de commande puis valider `npm test` et `npm run build`.
+
+## Sélection des plats en promotion individuelle (2026-09-29)
+- [x] Permettre de sélectionner certains plats en mode individuel.
+- [x] Conserver la contrainte de présence complète uniquement pour le mode pack.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
+## Clarification de la portée des promotions fidélité (2026-09-29)
+- [x] Limiter le programme à deux modes exclusifs : tous les plats individuellement ou un pack précis.
+- [x] Aligner le calcul serveur, l’aperçu client et le back-office sur ces deux modes.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
+## Correction fidélité et diagnostic des tarifs (2026-09-29)
+- [x] Synchroniser les récompenses encore disponibles avec la règle fidélité active.
+- [x] Vérifier les tarifs réellement publiés et documenter le comportement brouillon/publication.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
 ## Clarification du calcul des récompenses fidélité (2026-09-28)
 - [x] Centraliser le calcul de remise côté serveur et côté client.
 - [x] Appliquer le pourcentage au prix initial et plafonner le montant fixe au prix initial.
@@ -1316,3 +1354,42 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Tester le profil Redis partagé et le health check `sharedStore=redis`.
 - [x] Faire la revue finale de release: secrets, logs, uploads persistants, rollback et checklist client.
 - [ ] Acheter et initialiser le VPS, puis exécuter la migration sur une base PostgreSQL de production.
+
+## Correctif PWA livreur et adaptation desktop (2026-09-29)
+- [x] Rendre le bouton Courses fonctionnel avec un défilement fiable vers le pool disponible.
+- [x] Ajouter une composition desktop lisible sans modifier la hiérarchie mobile.
+- [x] Vérifier la route livreur, les tests et le build.
+
+## Renforcement sécurité PWA livreur (2026-09-29)
+- [x] Bloquer les mutations livreur envoyées depuis une origine web non autorisée.
+- [x] Couvrir la règle par un test unitaire sans casser les appels locaux.
+- [x] Vérifier les tests backend et le build après le changement.
+
+## Verrouillage PIN livreur (2026-09-29)
+- [x] Bloquer une connexion après cinq échecs pendant cinq minutes.
+- [x] Débloquer automatiquement la connexion après le délai et couvrir le comportement par test.
+- [x] Vérifier les tests backend et le build.
+
+## Vraie version desktop de la PWA livreur (2026-09-29)
+- [x] Remplacer la barre basse par une navigation latérale desktop avec identité de l'espace.
+- [x] Étendre le shell à la largeur de travail et organiser le contenu opérationnel en deux colonnes.
+- [x] Vérifier que la navigation mobile et le parcours livreur restent inchangés.
+
+## Harmonisation dark mode back-office et PWA livreur (2026-09-29)
+- [x] Aligner les fonds et surfaces du back-office sur la palette de la PWA livreur.
+- [x] Garder la structure, le mode clair et les interactions inchangés.
+- [x] Vérifier les tests et le build.
+# Refonte des statistiques du back-office (2026-09-29)
+
+- [x] Ajouter la comparaison avec la période précédente dans la réponse `site-stats`.
+- [x] Remplacer le graphique mélangé par des graphiques séparés : trafic, funnel, commandes et CA.
+- [x] Afficher les créneaux les plus demandés et rendre la performance des plats plus lisible.
+- [x] Harmoniser les styles responsive de la page statistiques.
+- [x] Ajouter/adapter les tests puis lancer `npm test` et `npm run build`.
+
+## Nettoyage et passation technique avant push (2026-09-29)
+
+- [x] Structurer les points sensibles du backend avec des commentaires courts et utiles.
+- [x] Ajouter un guide de lecture du projet pour le développement backend et la mise en production.
+- [x] Vérifier les fichiers suivis, les secrets, le lint implicite et les tests/build.
+- [x] Committer puis pousser les changements validés sur la branche courante.

@@ -104,6 +104,61 @@ test("calculates fixed rewards from the initial eligible price and caps them", (
   assert.equal(calculateRewardDiscountCents(70000, "fixed", 1000), 70000);
 });
 
+test("items rewards apply individually to the selected dishes", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const [first, second, other] = menu.listPublished();
+  loyalty.updateSettings({
+    threshold: 1,
+    rewardType: "percentage",
+    rewardValue: 10,
+    rewardScope: "items",
+    // Individual mode can target a subset of the menu.
+    eligibleDishIds: [first.id],
+    title: "-10 % sur tous les plats",
+    active: true,
+  });
+  assert.deepEqual(loyalty.getSettings().eligibleDishIds, [first.id]);
+
+  const qualifyingOrder = orders.createOrder(orderBody(other.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  const discounted = orders.createOrder({
+    ...orderBody(first.id),
+    loyaltyRewardId: reward.id,
+    items: [first, second].map((item) => ({ productId: item.id, quantity: 1 })),
+  }, { customerId });
+  assert.equal(discounted.discountCents, Math.floor(first.priceCents * 10 / 100));
+});
+
+test("fixed items rewards are applied once per selected dish quantity", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const [first, second, other] = menu.listPublished();
+  loyalty.updateSettings({
+    threshold: 1,
+    rewardType: "fixed",
+    rewardValue: 10,
+    rewardScope: "items",
+    eligibleDishIds: [first.id, second.id],
+    title: "-10 DA par plat",
+    active: true,
+  });
+
+  const qualifyingOrder = orders.createOrder(orderBody(other.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  const discounted = orders.createOrder({
+    ...orderBody(first.id),
+    loyaltyRewardId: reward.id,
+    items: [
+      { productId: first.id, quantity: 2 },
+      { productId: second.id, quantity: 1 },
+      { productId: other.id, quantity: 1 },
+    ],
+  }, { customerId });
+
+  assert.equal(discounted.discountCents, 3000);
+});
+
 test("persists a fixed reward as a subtraction from the order subtotal", (t) => {
   const { menu, orders, loyalty, customerId } = createSystems(t);
   const item = menu.listPublished()[0];
@@ -181,4 +236,50 @@ test("fixed pack rewards subtract the fixed amount from the pack subtotal only",
   const expectedDiscount = Math.min(eligibleSubtotal, 10000);
   assert.equal(packOrder.discountCents, expectedDiscount);
   assert.equal(packOrder.totalCents, other.priceCents + eligibleSubtotal - expectedDiscount);
+});
+
+test("updates available rewards when the active rule changes from items to pack", (t) => {
+  const { menu, orders, loyalty, customerId } = createSystems(t);
+  const [first, second, other] = menu.listPublished();
+  loyalty.updateSettings({
+    threshold: 1,
+    rewardType: "percentage",
+    rewardValue: 10,
+    rewardScope: "items",
+    eligibleDishIds: [first.id],
+    title: "-10 % sur un plat",
+    active: true,
+  });
+
+  const qualifyingOrder = orders.createOrder(orderBody(other.id), { customerId });
+  completeOrder(orders, qualifyingOrder.id);
+  const reward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  assert.equal(reward.rewardScope, "items");
+
+  loyalty.updateSettings({
+    rewardType: "percentage",
+    rewardValue: 20,
+    rewardScope: "pack",
+    eligibleDishIds: [first.id, second.id],
+    title: "Pack -20 %",
+  });
+
+  const updatedReward = loyalty.getCustomerProgress(customerId).rewardAvailable;
+  assert.equal(updatedReward.id, reward.id);
+  assert.equal(updatedReward.rewardScope, "pack");
+  assert.equal(updatedReward.rewardValue, 20);
+  assert.equal(updatedReward.title, "Pack -20 %");
+
+  assert.throws(
+    () => orders.createOrder({ ...orderBody(first.id), loyaltyRewardId: updatedReward.id }, { customerId }),
+    (error) => error.code === "LOYALTY_REWARD_UNAVAILABLE",
+  );
+
+  const packOrder = orders.createOrder({
+    ...orderBody(first.id),
+    loyaltyRewardId: updatedReward.id,
+    items: [first, second].map((item) => ({ productId: item.id, quantity: 1 })),
+  }, { customerId });
+  const eligibleSubtotal = first.priceCents + second.priceCents;
+  assert.equal(packOrder.discountCents, Math.floor(eligibleSubtotal * 20 / 100));
 });

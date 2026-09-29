@@ -72,3 +72,33 @@ test("delivery cancellation is only available after the driver starts the route"
     (error) => error instanceof DriverError && error.code === "ORDER_NOT_DELIVERY_CANCELLABLE",
   );
 });
+
+test("driver login locks after five failed PIN attempts and unlocks after five minutes", (t) => {
+  let nowMs = Date.parse("2026-09-28T19:00:00.000Z");
+  const store = new SqliteReservationStore();
+  t.after(() => store.close());
+  const drivers = new DriverSystem({ db: store.db, now: () => new Date(nowMs) });
+  drivers.create({ firstName: "Nora", phone: "+213555987654", pin: "1234" });
+
+  for (let attempt = 1; attempt < 5; attempt += 1) {
+    assert.throws(
+      () => drivers.loginWithPin({ phone: "+213555987654", pin: "0000" }),
+      (error) => error instanceof DriverError && error.code === "DRIVER_INVALID_CREDENTIALS" && error.status === 401,
+    );
+  }
+  assert.throws(
+    () => drivers.loginWithPin({ phone: "+213555987654", pin: "0000" }),
+    (error) => error instanceof DriverError
+      && error.code === "DRIVER_LOGIN_LOCKED"
+      && error.status === 429
+      && error.details.retryAfterSeconds === 300,
+  );
+  assert.throws(
+    () => drivers.loginWithPin({ phone: "+213555987654", pin: "1234" }),
+    (error) => error instanceof DriverError && error.code === "DRIVER_LOGIN_LOCKED",
+  );
+
+  nowMs += 5 * 60 * 1000 + 1;
+  const login = drivers.loginWithPin({ phone: "+213555987654", pin: "1234" });
+  assert.equal(login.driver.phone, "+213555987654");
+});

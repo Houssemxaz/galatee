@@ -23,7 +23,7 @@ export class AnalyticsError extends Error {
 
 export class AnalyticsSystem {
   constructor({ db, now = () => new Date(), currency = "DZD" } = {}) {
-    if (!db) throw new Error("AnalyticsSystem requires a SQLite database.");
+    if (!db) throw new Error("AnalyticsSystem requires a database adapter.");
     this.db = db;
     this.now = now;
     this.currency = currency;
@@ -143,6 +143,13 @@ export class AnalyticsSystem {
     const current = this.queryRange(range, groupBy);
     const orders = this.queryOrderAnalytics(range, groupBy);
     const traffic = this.queryTraffic(range, groupBy);
+    const dayCount = daysBetween(range.from, range.to) + 1;
+    const previousTo = shiftDate(range.from, -1);
+    const previousFrom = shiftDate(previousTo, -(dayCount - 1));
+    const previousRange = { from: previousFrom, to: previousTo };
+    const previousCurrent = this.queryRange(previousRange, groupBy);
+    const previousOrders = this.queryOrderAnalytics(previousRange, groupBy);
+    const previousTraffic = this.queryTraffic(previousRange, groupBy);
     const events = current.totals.events;
     const seriesPeriods = new Set([
       ...current.series.map((point) => point.period),
@@ -169,6 +176,8 @@ export class AnalyticsSystem {
       from: range.from,
       to: range.to,
       groupBy,
+      currency: this.currency,
+      database: this.db.isPostgres ? "postgres" : "sqlite",
       totals: {
         menuViews: events.menuViewed,
         siteViews: traffic.totals.pageViews,
@@ -182,6 +191,18 @@ export class AnalyticsSystem {
           orderCtaClicked: events.orderCtaClicked,
           orderStarted: events.orderStarted,
           orderSubmitted: events.orderSubmitted,
+        },
+      },
+      previousPeriod: {
+        from: previousFrom,
+        to: previousTo,
+        totals: {
+          menuViews: previousCurrent.totals.events.menuViewed,
+          siteViews: previousTraffic.totals.pageViews,
+          uniqueVisitors: previousTraffic.totals.uniqueVisitors,
+          traffic: previousTraffic.totals,
+          orders: previousOrders.totals,
+          events: previousCurrent.totals.events,
         },
       },
       series,

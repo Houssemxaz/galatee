@@ -2655,7 +2655,16 @@ html[data-bo-theme="dark"] {
   --bo-hairline-strong: rgba(244, 241, 232, 0.20);
 }
 html[data-bo-theme="dark"] body,
-html[data-bo-theme="dark"] .bo-shell { background: linear-gradient(160deg, #11140F 0%, #181B15 100%); }
+html[data-bo-theme="dark"] .bo-shell {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(130, 201, 146, .09), transparent 28%),
+    linear-gradient(160deg, #11140F 0%, #181B15 100%);
+}
+html[data-bo-theme="dark"] body {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(130, 201, 146, .09), transparent 28%),
+    linear-gradient(160deg, #11140F 0%, #181B15 100%);
+}
 html[data-bo-theme="dark"] .bo-sidebar { background: #11140F; }
 html[data-bo-theme="dark"] .bo-table-wrap,
 html[data-bo-theme="dark"] .bo-stats-section,

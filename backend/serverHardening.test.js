@@ -19,6 +19,7 @@ async function startTestServer(t, options = {}) {
     },
     rateLimiters: options.rateLimiters,
     idempotencyStore: options.idempotencyStore,
+    corsAllowedOrigin: options.corsAllowedOrigin,
   });
   await new Promise((resolve) => server.listen(0, resolve));
   t.after(() => server.close());
@@ -35,7 +36,23 @@ test("health endpoints and security headers are available without credentials", 
 
   const ready = await fetch(`${baseUrl}/health/ready`);
   assert.equal(ready.status, 200);
-  assert.equal((await ready.json()).database, "ok");
+  const readyBody = await ready.json();
+  assert.equal(readyBody.database, "ok");
+  assert.equal(readyBody.databaseMode, "sqlite");
+});
+
+test("driver mutations reject a foreign browser origin", async (t) => {
+  const { baseUrl } = await startTestServer(t, { corsAllowedOrigin: "https://app.example" });
+  const response = await fetch(`${baseUrl}/api/driver/login`, {
+    method: "POST",
+    headers: {
+      Origin: "https://attacker.example",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ phone: "+213555000000", pin: "1234" }),
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "DRIVER_ORIGIN_FORBIDDEN");
 });
 
 test("admin rate limiting returns 429 and Retry-After", async (t) => {

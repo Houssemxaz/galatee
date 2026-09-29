@@ -8,6 +8,8 @@ export const RATE_LIMIT_DEFAULTS = {
   admin: { windowMs: 60 * 1000, max: 120 },
 };
 
+// Le limiteur mémoire est volontairement simple pour le développement et le
+// scénario mono-instance. Il ne doit pas être présenté comme un store partagé.
 export class InMemoryRateLimiter {
   constructor({ windowMs, max, name = "default" } = {}) {
     if (!windowMs || !max) throw new Error("InMemoryRateLimiter requires windowMs and max.");
@@ -51,6 +53,8 @@ const REDIS_RATE_LIMIT_SCRIPT = `
   return { current, redis.call('PTTL', KEYS[1]) }
 `;
 
+// INCR + PEXPIRE sont exécutés dans un seul script Redis afin d'éviter les
+// courses entre plusieurs requêtes ou plusieurs conteneurs backend.
 export class RedisRateLimiter {
   constructor({ client, windowMs, max, name = "default", keyPrefix = "galatee:rate:" } = {}) {
     if (!client || !windowMs || !max) throw new Error("RedisRateLimiter requires client, windowMs and max.");

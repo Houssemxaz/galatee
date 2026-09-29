@@ -5804,6 +5804,7 @@ a.pbg-contact-channel:hover { background: rgba(245, 239, 228, 0.22); border-colo
 .pbg-dish-card-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .pbg-dish-card-title { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(22px, 2.4vw, 30px); line-height: 1; letter-spacing: 0.01em; color: var(--charcoal); text-transform: uppercase; }
 .pbg-dish-card-price { flex: 0 0 auto; padding-top: 2px; font-family: var(--body); font-size: 13px; font-weight: 700; line-height: 1.2; letter-spacing: 0.04em; color: var(--accent); white-space: nowrap; }
+.pbg-dish-card-promo { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; margin-bottom: 8px; padding: 5px 8px; border-radius: 999px; background: rgba(208, 54, 43, .1); color: var(--accent, #D0362B); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .pbg-dish-card-summary { margin: 0; font-family: var(--body); font-size: 13.5px; line-height: 1.55; color: var(--ink); opacity: 0.82; }
 .pbg-dish-card-cta { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--body); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); transition: gap 220ms var(--ease-out); }
 .pbg-dish-card:hover .pbg-dish-card-cta { gap: 12px; }

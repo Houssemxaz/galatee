@@ -8,7 +8,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Reveal from "@/components/Reveal";
 import ShineCTA from "@/components/ShineCTA";
 import SEO from "@/components/SEO";
-import { calculateRewardDiscountCents, getEligibleLines, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { calculateRewardDiscountCents, calculateRewardDiscountForLines, getEligibleLines, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { getBestPromotion } from "@/lib/promotions";
 import { createOrder, fetchCustomerOrders, fetchDeliveryCommunes, fetchMenu, trackEvent } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useCart } from "@/context/CartContext";
@@ -106,9 +107,14 @@ export default function CheckoutContactPage() {
   const eligibleLines = getEligibleLines(lines, loyaltySettings);
   const eligibleSubtotal = eligibleLines.reduce((sum, item) => sum + item.lineTotal, 0);
   const rewardApplicable = isRewardApplicable(lines, loyaltySettings);
-  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
-    ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
+  const loyaltyDiscount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
+    ? loyaltySettings.rewardScope === "pack"
+      ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
+      : calculateRewardDiscountForLines(eligibleLines, reward.rewardType, reward.rewardValue)
     : 0;
+  const directPromotion = useMemo(() => getBestPromotion(lines, menu.promotions || []), [lines, menu]);
+  const discount = Math.max(directPromotion?.discountCents || 0, loyaltyDiscount);
+  const directPromotionApplied = directPromotion && directPromotion.discountCents >= loyaltyDiscount;
   const total = Math.max(0, subtotal + deliveryFee - discount);
 
   useEffect(() => {
@@ -350,7 +356,13 @@ export default function CheckoutContactPage() {
                   <strong>{formatDzd(subtotal)}</strong>
                 </p>
                 <p><span>Livraison</span><strong>{form.deliveryMode === "delivery" ? (selectedCommune ? formatDzd(deliveryFee) : "Selon commune") : "Retrait sur place"}</strong></p>
-                {discount > 0 && (
+                {directPromotionApplied && (
+                  <p className="order-inline-discount">
+                    <span>Promotion directe · {directPromotion.title}</span>
+                    <strong>− {formatDzd(directPromotion.discountCents)}</strong>
+                  </p>
+                )}
+                {discount > 0 && !directPromotionApplied && (
                   <p className="order-inline-discount">
                     <span>
                       🎁 Récompense fidélité

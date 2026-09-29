@@ -13,6 +13,7 @@ import {
 import { MenuError, MenuSystem } from "./menuSystem.js";
 import { OrderError, OrderSystem } from "./orderSystem.js";
 import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
+import { PromotionError, PromotionSystem } from "./promotionsSystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
 import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
 import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
@@ -23,6 +24,7 @@ import {
   ensureRequestId,
   IS_PRODUCTION,
   isSecureRequest,
+  isAllowedMutationOrigin,
   logger,
   NODE_ENV,
   resolveClientIp,
@@ -41,6 +43,9 @@ const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
 const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";
 const usePostgres = (process.env.GALATEE_DATABASE || "sqlite").toLowerCase() === "postgres";
+if (process.env.NODE_ENV === "production" && !usePostgres) {
+  throw new Error("Production runtime requires GALATEE_DATABASE=postgres; SQLite is local-only.");
+}
 const runtimeDatabase = usePostgres
   ? new PostgresSyncDatabase({ connectionString: process.env.DATABASE_URL })
   : openSqliteDatabase(databasePath);
@@ -54,11 +59,26 @@ const defaultRateLimiters = {
 };
 const defaultIdempotencyStore = new InMemoryIdempotencyStore();
 
+// Les chemins sensibles sont regroupés ici pour que l'audit du rate limiting
+// reste lisible sans parcourir tout le routeur HTTP.
+const CUSTOMER_AUTH_RATE_LIMIT_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/auth/request-code",
+  "/api/auth/request-password-reset",
+  "/api/auth/confirm-password-reset",
+  "/api/auth/verify-code",
+]);
+const ADMIN_RATE_LIMIT_PATH = /^\/api\/admin\//;
+const MENU_IMAGE_RATE_LIMIT_PATH = /^\/api\/admin\/menu\/[^/]+\/image$/;
+
 export function createSharedStoreRuntime({
   redisUrl = process.env.REDIS_URL || "",
   keyPrefix = process.env.REDIS_KEY_PREFIX || "galatee:",
 } = {}) {
   if (!redisUrl) {
+    // Une seule instance backend peut utiliser la mémoire. Redis devient
+    // nécessaire dès que plusieurs instances doivent partager ces compteurs.
     return {
       mode: "memory",
       rateLimiters: defaultRateLimiters,
@@ -87,7 +107,8 @@ export function createSharedStoreRuntime({
 
 const menuSystem = new MenuSystem({ db: runtimeDatabase, uploadRoot: menuUploadDir });
 const loyaltySystem = new LoyaltySystem({ db: runtimeDatabase });
-const orderSystem = new OrderSystem({ db: runtimeDatabase, menu: menuSystem, loyalty: loyaltySystem });
+const promotionSystem = new PromotionSystem({ db: runtimeDatabase });
+const orderSystem = new OrderSystem({ db: runtimeDatabase, menu: menuSystem, loyalty: loyaltySystem, promotions: promotionSystem });
 const analyticsSystem = new AnalyticsSystem({ db: runtimeDatabase });
 const customerAuthSystem = new CustomerAuthSystem({ db: runtimeDatabase });
 const clubSystem = new ClubSystem({ db: runtimeDatabase });
@@ -111,6 +132,7 @@ export function createApp({
   menu = menuSystem,
   orders = orderSystem,
   loyalty = loyaltySystem,
+  promotions = promotionSystem,
   analytics = analyticsSystem,
   customerAuth = customerAuthSystem,
   club = clubSystem,
@@ -135,15 +157,35 @@ export function createApp({
         return;
       }
 
+      if (
+        url.pathname.startsWith("/api/driver/")
+        && !["GET", "HEAD"].includes(request.method)
+        && !isAllowedMutationOrigin(request, corsAllowedOrigin)
+      ) {
+        return sendJson(response, 403, {
+          error: {
+            code: "DRIVER_ORIGIN_FORBIDDEN",
+            message: "Origine de requête non autorisée.",
+          },
+        });
+      }
+
       if (url.pathname === "/health/live" && request.method === "GET") {
         return sendJson(response, 200, { status: "ok" });
       }
 
       if (url.pathname === "/health/ready" && request.method === "GET") {
         try {
+          // Le readiness check vérifie la base et le store partagé avant de
+          // laisser le reverse proxy envoyer du trafic vers cette instance.
           database.prepare("SELECT 1 AS ok").get();
           if (!(await sharedStoreHealth())) throw new Error("Shared store is not ready.");
-          return sendJson(response, 200, { status: "ok", database: "ok", sharedStore: "ok" });
+          return sendJson(response, 200, {
+            status: "ok",
+            database: "ok",
+            databaseMode: database?.isPostgres ? "postgres" : "sqlite",
+            sharedStore: "ok",
+          });
         } catch (error) {
           logger.error("health.ready.db_failure", { requestId, error: error.message });
           return sendJson(response, 503, { status: "unavailable", database: "unavailable" });
@@ -271,8 +313,15 @@ export function createApp({
       }
 
       if (url.pathname === "/api/menu" && request.method === "GET") {
-        const payload = { menu: menu.listPublished({ category: url.searchParams.get("category") }) };
+        const payload = {
+          menu: menu.listPublished({ category: url.searchParams.get("category") }),
+          promotions: promotions.list({ activeOnly: true }),
+        };
         return sendJson(response, 200, payload);
+      }
+
+      if (url.pathname === "/api/promotions" && request.method === "GET") {
+        return sendJson(response, 200, { promotions: promotions.list({ activeOnly: true }) });
       }
 
       if (url.pathname === "/api/pasta-lover-club" && request.method === "GET") {
@@ -350,6 +399,29 @@ export function createApp({
       if (url.pathname === "/api/admin/loyalty" && (request.method === "PUT" || request.method === "PATCH")) {
         assertAdminAuthorized(request, requiredAdminToken);
         return sendJson(response, 200, { settings: loyalty.updateSettings(await readJsonBody(request)) });
+      }
+
+      if (url.pathname === "/api/admin/promotions" && request.method === "GET") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { promotions: promotions.list() });
+      }
+
+      if (url.pathname === "/api/admin/promotions" && request.method === "POST") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 201, { promotion: promotions.create(await readJsonBody(request)) });
+      }
+
+      const promotionMatch = url.pathname.match(/^\/api\/admin\/promotions\/([^/]+)$/);
+      if (promotionMatch && request.method === "PATCH") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, {
+          promotion: promotions.update(decodeURIComponent(promotionMatch[1]), await readJsonBody(request)),
+        });
+      }
+
+      if (promotionMatch && request.method === "DELETE") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { promotion: promotions.deactivate(decodeURIComponent(promotionMatch[1])) });
       }
 
       const menuItemMatch = url.pathname.match(/^\/api\/admin\/menu\/([^/]+)$/);
@@ -625,7 +697,7 @@ export function createApp({
 
       return serveStatic(url.pathname, request.method, response);
     } catch (error) {
-      if (error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
+      if (error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof PromotionError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
         return sendJson(response, error.status, {
           error: {
             code: error.code,
@@ -704,22 +776,17 @@ async function enforceRateLimit(limiters, url, request, response) {
   const { method } = request;
   const { pathname } = url;
   if (method === "POST") {
-    if (
-      pathname === "/api/auth/login"
-      || pathname === "/api/auth/signup"
-      || pathname === "/api/auth/request-code"
-      || pathname === "/api/auth/request-password-reset"
-      || pathname === "/api/auth/confirm-password-reset"
-      || pathname === "/api/auth/verify-code"
-    ) return applyRateLimit(limiters.auth, request, response, "customer-auth");
+    if (CUSTOMER_AUTH_RATE_LIMIT_PATHS.has(pathname)) {
+      return applyRateLimit(limiters.auth, request, response, "customer-auth");
+    }
     if (pathname === "/api/driver/login") return applyRateLimit(limiters.auth, request, response, "driver-login");
     if (pathname === "/api/orders") return applyRateLimit(limiters.order, request, response, "order");
     if (pathname === "/api/analytics/events") return applyRateLimit(limiters.analytics, request, response, "analytics");
-    if (/^\/api\/admin\/menu\/[^/]+\/image$/.test(pathname)) {
+    if (MENU_IMAGE_RATE_LIMIT_PATH.test(pathname)) {
       return applyRateLimit(limiters.upload, request, response, "menu-image");
     }
   }
-  if (pathname.startsWith("/api/admin/")) return applyRateLimit(limiters.admin, request, response, "admin");
+  if (ADMIN_RATE_LIMIT_PATH.test(pathname)) return applyRateLimit(limiters.admin, request, response, "admin");
   return true;
 }
 

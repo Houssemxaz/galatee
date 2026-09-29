@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Minus, Package, Plus } from "lucide-react";
+import { ArrowUpRight, Minus, Package, Plus, Tag } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Reveal from "@/components/Reveal";
 import { fetchCustomerOrders, fetchMenu, trackEvent } from "@/lib/api";
@@ -11,7 +11,8 @@ import PopCTA from "@/components/PopCTA";
 import GlowCard from "@/components/GlowCard";
 import DishImage from "@/components/DishImage";
 import SEO from "@/components/SEO";
-import { calculateRewardDiscountCents, getEligibleLines, getMissingEligibleTitles, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { calculateRewardDiscountCents, calculateRewardDiscountForLines, getEligibleLines, getMissingEligibleTitles, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { getBestPromotion } from "@/lib/promotions";
 import { formatDzd } from "@/lib/formatters";
 
 export default function OrderPage() {
@@ -60,9 +61,14 @@ export default function OrderPage() {
   const eligibleTitles = eligibleLines.map((item) => item.title);
   const missingPackTitles = getMissingEligibleTitles(lines, menu, loyaltySettings);
   const rewardApplicable = isRewardApplicable(lines, loyaltySettings);
-  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
-    ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
+  const loyaltyDiscount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
+    ? loyaltySettings.rewardScope === "pack"
+      ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
+      : calculateRewardDiscountForLines(eligibleLines, reward.rewardType, reward.rewardValue)
     : 0;
+  const directPromotion = useMemo(() => getBestPromotion(lines, menu.promotions || []), [lines, menu]);
+  const discount = Math.max(directPromotion?.discountCents || 0, loyaltyDiscount);
+  const directPromotionApplied = directPromotion && directPromotion.discountCents >= loyaltyDiscount;
   const totalEstimated = Math.max(0, subtotal - discount);
 
   useEffect(() => {
@@ -171,6 +177,20 @@ export default function OrderPage() {
               </div>
             )}
 
+            {directPromotion && (
+              <div className="pbg-reward-card pbg-promotion-card is-applied">
+                <div className="pbg-reward-toggle">
+                  <span className="pbg-reward-body">
+                    <span className="pbg-reward-badge"><Tag size={15} strokeWidth={1.8} />−{directPromotion.rewardValue}{directPromotion.rewardType === "percentage" ? "%" : " DA"}</span>
+                    <span className="pbg-reward-text">
+                      <strong>{directPromotion.title}</strong>
+                      <small>Promotion directe appliquée automatiquement{directPromotion.scope === "pack" ? " · pack complet" : " · plat ciblé"}</small>
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
+
             {reward && (
               <div className={`pbg-reward-card ${form.loyaltyRewardId ? "is-applied" : ""}`}>
                 <label className="pbg-reward-toggle">
@@ -206,14 +226,14 @@ export default function OrderPage() {
             <div className="order-totals">
               <p>
                 <span>Sous-total</span>
-                {discount > 0
-                  ? <strong className="pbg-total-before"><s>{formatDzd(subtotal)}</s> {formatDzd(subtotal - discount)}</strong>
+              {discount > 0
+                ? <strong className="pbg-total-before"><s>{formatDzd(subtotal)}</s> {formatDzd(subtotal - discount)}</strong>
                   : <strong>{formatDzd(subtotal)}</strong>}
               </p>
               <p><span>Livraison</span><strong>À l'étape suivante</strong></p>
               {discount > 0 && (
                 <p className="order-totals-discount">
-                  <span>Récompense fidélité{reward?.rewardType === "percentage" && ` (−${reward.rewardValue}%)`}</span>
+                  <span>{directPromotionApplied ? directPromotion.title : `Récompense fidélité${reward?.rewardType === "percentage" ? ` (−${reward.rewardValue}%)` : ""}`}</span>
                   <strong>− {formatDzd(discount)}</strong>
                 </p>
               )}

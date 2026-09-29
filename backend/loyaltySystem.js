@@ -138,24 +138,45 @@ export class LoyaltySystem {
     const current = this.getSettings();
     const settings = normalizeSettings({ ...current, ...input });
     const timestamp = this.now().toISOString();
-    this.db.prepare(`
-      UPDATE loyalty_settings
-      SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?, reward_scope = ?,
-          title = ?, description = ?, active = ?, eligible_dish_ids = ?,
-          reward_expiration_days = ?, updated_at = ?
-      WHERE id = 'default'
-    `).run(
-      settings.threshold,
-      settings.rewardType,
-      settings.rewardValue,
-      settings.rewardScope,
-      settings.title,
-      settings.description,
-      settings.active ? 1 : 0,
-      settings.eligibleDishIds.length ? JSON.stringify(settings.eligibleDishIds) : null,
-      settings.rewardExpirationDays,
-      timestamp,
-    );
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare(`
+        UPDATE loyalty_settings
+        SET qualifying_order_threshold = ?, reward_type = ?, reward_value = ?, reward_scope = ?,
+            title = ?, description = ?, active = ?, eligible_dish_ids = ?,
+            reward_expiration_days = ?, updated_at = ?
+        WHERE id = 'default'
+      `).run(
+        settings.threshold,
+        settings.rewardType,
+        settings.rewardValue,
+        settings.rewardScope,
+        settings.title,
+        settings.description,
+        settings.active ? 1 : 0,
+        settings.eligibleDishIds.length ? JSON.stringify(settings.eligibleDishIds) : null,
+        settings.rewardExpirationDays,
+        timestamp,
+      );
+
+      // Une récompense disponible doit suivre la règle active : une ancienne
+      // récompense ne doit pas rester bloquée sur le mode « plats » après un
+      // passage au mode « pack » dans le back-office.
+      this.db.prepare(`
+        UPDATE loyalty_rewards
+        SET reward_type = ?, reward_value = ?, reward_scope = ?, title = ?
+        WHERE status = 'available'
+      `).run(
+        settings.rewardType,
+        settings.rewardValue,
+        settings.rewardScope,
+        settings.title,
+      );
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
     return this.getSettings();
   }
 
@@ -271,8 +292,11 @@ export class LoyaltySystem {
     const settings = this.getSettings();
     const eligibleIds = settings.eligibleDishIds || [];
     let eligibleAmount = subtotal;
-    if (eligibleIds.length && Array.isArray(items)) {
-      const eligibleItems = items.filter((item) => eligibleIds.includes(item.productId || item.id));
+    let eligibleItems = null;
+    if (Array.isArray(items)) {
+      eligibleItems = eligibleIds.length
+        ? items.filter((item) => eligibleIds.includes(item.productId || item.id))
+        : items;
       if (row.reward_scope === "pack") {
         const presentIds = new Set(eligibleItems.filter((item) => Number(item.quantity) > 0).map((item) => item.productId || item.id));
         if (eligibleIds.length < 2 || eligibleIds.some((id) => !presentIds.has(id))) return null;
@@ -281,7 +305,9 @@ export class LoyaltySystem {
     }
     if (eligibleIds.length && eligibleAmount <= 0) return null;
 
-    const discountCents = calculateRewardDiscountCents(eligibleAmount, row.reward_type, row.reward_value);
+    const discountCents = row.reward_scope === "items" && eligibleItems
+      ? calculateRewardDiscountForItems(eligibleItems, row.reward_type, row.reward_value)
+      : calculateRewardDiscountCents(eligibleAmount, row.reward_type, row.reward_value);
     return {
       id: row.id,
       title: row.title,
@@ -343,6 +369,18 @@ export function calculateRewardDiscountCents(amountCents, rewardType, rewardValu
   return Math.min(amount, Math.floor(amount * value / 100));
 }
 
+export function calculateRewardDiscountForItems(items = [], rewardType, rewardValue) {
+  if (!Array.isArray(items)) return 0;
+  return items.reduce((sum, item) => {
+    const lineTotalCents = Math.max(0, Math.trunc(Number(item.lineTotalCents ?? item.lineTotal) || 0));
+    const quantity = Math.max(1, Math.trunc(Number(item.quantity) || 1));
+    const discount = rewardType === "fixed"
+      ? Math.min(lineTotalCents, Math.max(0, Math.trunc(Number(rewardValue) || 0)) * 100 * quantity)
+      : calculateRewardDiscountCents(lineTotalCents, rewardType, rewardValue);
+    return sum + discount;
+  }, 0);
+}
+
 function normalizeSettings(input) {
   const threshold = Number(input.threshold);
   if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
@@ -362,12 +400,15 @@ function normalizeSettings(input) {
   }
   const title = normalizeText(input.title, "LOYALTY_TITLE_INVALID", 120);
   const description = normalizeText(input.description, "LOYALTY_DESCRIPTION_INVALID", 300, true);
-  const eligibleDishIds = Array.isArray(input.eligibleDishIds)
+  const selectedDishIds = Array.isArray(input.eligibleDishIds)
     ? input.eligibleDishIds
         .filter((id) => typeof id === "string" && id.trim())
         .map((id) => id.trim())
         .slice(0, 100)
     : [];
+  // En mode individuel, une liste permet de cibler certains plats ; une liste
+  // vide signifie tous les plats. En mode pack, la liste décrit le pack.
+  const eligibleDishIds = selectedDishIds;
   if (rewardScope === "pack" && eligibleDishIds.length < 2) {
     throw new LoyaltyError("LOYALTY_PACK_DISHES_REQUIRED", "A pack reward requires at least two selected dishes.");
   }

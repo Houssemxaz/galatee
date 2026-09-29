@@ -53,11 +53,11 @@ Removes the image from a new draft revision.
 
 ### `GET /api/admin/site-stats?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month|year`
 
-Requires admin authorization. Returns only operational site statistics: menu views, reservation status counts, the reservation funnel and the eight busiest non-cancelled time slots. No revenue data is included.
+Requires admin authorization. Returns live site traffic, menu views, order status counts, confirmed revenue, product performance and the eight busiest non-cancelled time slots. The response includes `previousPeriod`, `currency` and `database`; `database` is `postgres` in production and `sqlite` only for local development. The React back-office consumes this endpoint directly and does not use mock statistics.
 
 ### `POST /api/analytics/events`
 
-Public, non-personal endpoint for anonymous site and reservation events. Allowed events are `menu_viewed`, `reservation_cta_clicked`, `reservation_started` and `reservation_submitted`. An optional anonymous `sessionId` may be supplied; IP addresses are not stored.
+Public, non-personal endpoint for anonymous site and order events. Allowed events are `page_viewed`, `menu_viewed`, `dish_viewed`, `order_cta_clicked`, `order_started` and `order_submitted`. An optional anonymous `sessionId` may be supplied; IP addresses are not stored.
 
 ## Legacy revenue compatibility API
 

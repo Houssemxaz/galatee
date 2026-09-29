@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
 import { calculateRewardDiscountCents } from "@/lib/loyalty";
+import MarketingTabs from "../marketing/MarketingTabs.jsx";
 
 const DEFAULT_SETTINGS = {
   threshold: 10,
@@ -23,19 +24,19 @@ function rewardLabel(settings) {
 }
 
 function scopeLabel(settings, dishes) {
-  if (!settings.eligibleDishIds?.length) return "Tous les plats";
-  if (settings.eligibleDishIds.length === 1) {
-    const dish = dishes.find((entry) => entry.id === settings.eligibleDishIds[0]);
-    return dish?.current?.title ? `Uniquement : ${dish.current.title}` : "1 plat sélectionné";
+  if (settings.rewardScope !== "pack") {
+    if (!settings.eligibleDishIds?.length) return "Tous les plats, individuellement";
+    return `${settings.eligibleDishIds.length} plat${settings.eligibleDishIds.length > 1 ? "s" : ""}, individuellement`;
   }
-  return `${settings.eligibleDishIds.length} plats sélectionnés`;
+  if (!settings.eligibleDishIds?.length) return "Pack à définir";
+  return `Pack de ${settings.eligibleDishIds.length} plats`;
 }
 
 function formatDzd(cents) {
   return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
 }
 
-export default function LoyaltyPage() {
+export default function LoyaltyPage({ onNavigate }) {
   const [settings, setSettings] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [dishes, setDishes] = useState([]);
@@ -79,13 +80,17 @@ export default function LoyaltyPage() {
     });
   }
 
-  function selectAllDishes() {
-    setSettings((current) => ({ ...current, eligibleDishIds: [], rewardScope: "items" }));
+  function selectPack() {
+    setSettings((current) => ({ ...current, rewardScope: "pack" }));
+  }
+
+  function selectIndividual() {
+    setSettings((current) => ({ ...current, rewardScope: "items" }));
   }
 
   const scope = useMemo(() => (
-    settings?.eligibleDishIds?.length ? "specific" : "all"
-  ), [settings?.eligibleDishIds]);
+    settings?.rewardScope === "pack" ? "pack" : "all"
+  ), [settings?.rewardScope]);
 
   const preview = useMemo(() => {
     if (!settings) return { items: [], initialCents: 0, discountCents: 0, afterCents: 0 };
@@ -96,11 +101,23 @@ export default function LoyaltyPage() {
       id: dish.id,
       title: dish.current?.title || dish.published?.title || "(sans titre)",
       priceCents: Math.max(0, Number(dish.current?.priceCents ?? dish.published?.priceCents ?? 0)),
-    }));
+    })).map((item) => {
+      const discountCents = calculateRewardDiscountCents(item.priceCents, settings.rewardType, settings.rewardValue);
+      return { ...item, discountCents, afterCents: Math.max(0, item.priceCents - discountCents) };
+    });
     const initialCents = items.reduce((sum, item) => sum + item.priceCents, 0);
-    const discountCents = calculateRewardDiscountCents(initialCents, settings.rewardType, settings.rewardValue);
-    return { items, initialCents, discountCents, afterCents: Math.max(0, initialCents - discountCents) };
+    const discountCents = settings.rewardScope === "pack"
+      ? calculateRewardDiscountCents(initialCents, settings.rewardType, settings.rewardValue)
+      : 0;
+    return {
+      items,
+      initialCents,
+      discountCents,
+      afterCents: settings.rewardScope === "pack" ? Math.max(0, initialCents - discountCents) : null,
+    };
   }, [dishes, settings]);
+
+  const hasDishSelection = Boolean(settings?.eligibleDishIds?.length);
 
   async function save(event) {
     event.preventDefault();
@@ -130,6 +147,7 @@ export default function LoyaltyPage() {
 
   return (
     <section className="bo-loyalty-page">
+      <MarketingTabs active="loyalty" onNavigate={onNavigate} />
       <div className="bo-panel-heading bo-loyalty-heading">
         <div>
           <p className="bo-eyebrow">Relation client</p>
@@ -191,13 +209,13 @@ export default function LoyaltyPage() {
                   value={settings.rewardScope || "items"}
                   onChange={(event) => change("rewardScope", event.target.value)}
                 >
-                  <option value="items">Plats éligibles présents</option>
-                  <option value="pack">Pack complet</option>
+                  <option value="items">Plats sélectionnés, individuellement</option>
+                  <option value="pack">Un pack précis</option>
                 </select>
                 <small className="bo-loyalty-value-help">
                   {settings.rewardScope === "pack"
-                    ? "Tous les plats sélectionnés doivent être dans la commande."
-                    : "La remise porte uniquement sur les plats éligibles présents."}
+                    ? "Tous les plats sélectionnés doivent être présents pour débloquer la remise."
+                    : "Choisis certains plats, ou aucun pour inclure toute la carte. Chaque plat est remisé individuellement."}
                 </small>
               </label>
               <label>
@@ -257,28 +275,29 @@ export default function LoyaltyPage() {
                     role="tab"
                     aria-selected={scope === "all"}
                     className={`bo-loyalty-scope-tab ${scope === "all" ? "is-active" : ""}`}
-                    onClick={selectAllDishes}
+                    onClick={selectIndividual}
                   >
-                    Tous les plats
+                    Plats individuellement
                   </button>
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={scope === "specific"}
-                    className={`bo-loyalty-scope-tab ${scope === "specific" ? "is-active" : ""}`}
-                    onClick={() => {
-                      if (scope === "all" && dishes.length) {
-                        change("eligibleDishIds", [dishes[0].id]);
-                      }
-                    }}
+                    aria-selected={scope === "pack"}
+                    className={`bo-loyalty-scope-tab ${scope === "pack" ? "is-active" : ""}`}
+                    onClick={selectPack}
                   >
-                    Plats sélectionnés
+                    Un pack précis
                   </button>
                 </div>
               </div>
 
-              {scope === "specific" && (
+              {(scope === "all" || scope === "pack") && (
                 <div className="bo-loyalty-dish-grid">
+                  {scope === "all" && (
+                    <p className="bo-loyalty-value-help bo-loyalty-dish-help">
+                      Sélection facultative : sans sélection, tous les plats sont concernés individuellement.
+                    </p>
+                  )}
                   {dishes.length === 0 && (
                     <p className="bo-empty" style={{ margin: 0 }}>Aucun plat disponible.</p>
                   )}
@@ -317,31 +336,46 @@ export default function LoyaltyPage() {
                 </p>
               )}
 
-              {preview.items.length > 0 && !(settings.rewardScope === "pack" && settings.eligibleDishIds?.length < 2) && (
+              {hasDishSelection && preview.items.length > 0 && !(settings.rewardScope === "pack" && settings.eligibleDishIds?.length < 2) && (
                 <div className="bo-loyalty-preview" aria-live="polite">
                   <div>
                     <p className="bo-eyebrow">Aperçu du calcul</p>
                     <p>
-                      {scope === "specific"
-                        ? settings.rewardScope === "pack"
-                          ? `Simulation du pack complet sur ${preview.items.length} plats.`
-                          : `Simulation sur ${preview.items.length} article${preview.items.length > 1 ? "s" : ""} sélectionné${preview.items.length > 1 ? "s" : ""}.`
-                        : "Simulation sur les articles actuels : la remise s'applique au sous-total éligible de la commande."}
+                      {scope === "pack"
+                        ? `Simulation du pack complet sur ${preview.items.length} plats.`
+                        : settings.eligibleDishIds?.length
+                          ? `Simulation sur ${preview.items.length} plat${preview.items.length > 1 ? "s" : ""} sélectionné${preview.items.length > 1 ? "s" : ""}, individuellement.`
+                          : "Simulation sur tous les plats : chaque plat bénéficie individuellement de la remise."}
                     </p>
                   </div>
                   <div className="bo-loyalty-preview-result">
-                    <div className="bo-loyalty-preview-items">
-                      {preview.items.map((item) => (
-                        <span key={item.id}>{item.title} · {formatDzd(item.priceCents)}</span>
-                      ))}
-                    </div>
-                    <div className="bo-loyalty-preview-equation">
-                      <span>Sous-total initial</span>
-                      <strong>{formatDzd(preview.initialCents)}</strong>
-                      <span>− {settings.rewardType === "percentage" ? `${settings.rewardValue}% (${formatDzd(preview.discountCents)})` : formatDzd(Number(settings.rewardValue) * 100)}</span>
-                      <strong>= {formatDzd(preview.afterCents)}</strong>
-                    </div>
-                    <small className="bo-loyalty-preview-final">Prix après remise</small>
+                    {settings.rewardScope === "pack" ? (
+                      <>
+                        <div className="bo-loyalty-preview-items">
+                          {preview.items.map((item) => (
+                            <span key={item.id}>{item.title} · {formatDzd(item.priceCents)}</span>
+                          ))}
+                        </div>
+                        <div className="bo-loyalty-preview-equation">
+                          <span>Sous-total du pack</span>
+                          <strong>{formatDzd(preview.initialCents)}</strong>
+                          <span>− {settings.rewardType === "percentage" ? `${settings.rewardValue}% (${formatDzd(preview.discountCents)})` : formatDzd(Number(settings.rewardValue) * 100)}</span>
+                          <strong>= {formatDzd(preview.afterCents)}</strong>
+                        </div>
+                        <small className="bo-loyalty-preview-final">Prix du pack après remise</small>
+                      </>
+                    ) : (
+                      <div className="bo-loyalty-preview-item-list">
+                        {preview.items.map((item) => (
+                          <div className="bo-loyalty-preview-item" key={item.id}>
+                            <strong>{item.title}</strong>
+                            <span>
+                              {formatDzd(item.priceCents)} − {settings.rewardType === "percentage" ? `${settings.rewardValue}% (${formatDzd(item.discountCents)})` : formatDzd(Number(settings.rewardValue) * 100)} = <b>{formatDzd(item.afterCents)}</b>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -1290,3 +1290,9 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 - [x] Lazy-loader les pages secondaires du site et la PWA livreur.
 - [x] Lazy-loader les sections secondaires du back-office et les graphiques analytics.
 - [x] Conserver toutes les routes compte existantes et vérifier tests/build.
+
+## Durcissement production adapté (2026-09-29)
+- [x] Ajouter les headers de sécurité, CORS strict en production et les request IDs.
+- [x] Ajouter rate limiting, idempotence des commandes et health checks live/ready.
+- [x] Ajouter l'arrêt propre, les verrous de démarrage production et les tests régressifs.
+- [ ] Remplacer les stores mémoire par Redis si plusieurs instances backend sont déployées.

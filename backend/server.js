@@ -16,12 +16,26 @@ import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
 import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
 import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
+import {
+  applyCorsHeaders as applyCorsHeadersImpl,
+  applySecurityHeaders,
+  ensureRequestId,
+  IS_PRODUCTION,
+  isSecureRequest,
+  logger,
+  NODE_ENV,
+  resolveClientIp,
+  resolveCorsOrigin,
+  safeTokenCompare,
+} from "./security.js";
+import { applyRateLimit, limiterFromEnv } from "./rateLimit.js";
+import { InMemoryIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
 const reactDistDir = join(rootDir, "frontend-react", "dist");
-const databasePath = join(rootDir, "backend", "data", "galatee.sqlite");
-const menuUploadDir = join(rootDir, "backend", "data", "uploads", "menu");
+const databasePath = process.env.GALATEE_DB_PATH || join(rootDir, "backend", "data", "galatee.sqlite");
+const menuUploadDir = process.env.GALATEE_UPLOAD_DIR || join(rootDir, "backend", "data", "uploads", "menu");
 const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
 const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";
@@ -29,6 +43,15 @@ const usePostgres = (process.env.GALATEE_DATABASE || "sqlite").toLowerCase() ===
 const runtimeDatabase = usePostgres
   ? new PostgresSyncDatabase({ connectionString: process.env.DATABASE_URL })
   : openSqliteDatabase(databasePath);
+
+const defaultRateLimiters = {
+  auth: limiterFromEnv("AUTH", { windowMs: 15 * 60 * 1000, max: 20 }),
+  order: limiterFromEnv("ORDER", { windowMs: 60 * 1000, max: 8 }),
+  analytics: limiterFromEnv("ANALYTICS", { windowMs: 60 * 1000, max: 60 }),
+  upload: limiterFromEnv("UPLOAD", { windowMs: 60 * 1000, max: 10 }),
+  admin: limiterFromEnv("ADMIN", { windowMs: 60 * 1000, max: 120 }),
+};
+const defaultIdempotencyStore = new InMemoryIdempotencyStore();
 
 const menuSystem = new MenuSystem({ db: runtimeDatabase, uploadRoot: menuUploadDir });
 const loyaltySystem = new LoyaltySystem({ db: runtimeDatabase });
@@ -52,6 +75,7 @@ const mimeTypes = new Map([
 ]);
 
 export function createApp({
+  database = runtimeDatabase,
   menu = menuSystem,
   orders = orderSystem,
   loyalty = loyaltySystem,
@@ -61,17 +85,38 @@ export function createApp({
   drivers = driverSystem,
   requiredAdminToken = adminToken,
   corsAllowedOrigin = allowedOrigin,
+  rateLimiters = defaultRateLimiters,
+  idempotencyStore = defaultIdempotencyStore,
 } = {}) {
   return createServer(async (request, response) => {
+    const requestId = ensureRequestId(request);
+    response.setHeader("X-Request-Id", requestId);
     try {
       const url = new URL(request.url, "http://localhost");
-      applyCorsHeaders(response, corsAllowedOrigin);
+      applyCorsHeadersImpl(response, corsAllowedOrigin);
+      applySecurityHeaders(response, { isSecure: isSecureRequest(request) });
 
       if (request.method === "OPTIONS") {
         response.writeHead(204, { "Content-Length": "0" });
         response.end();
         return;
       }
+
+      if (url.pathname === "/health/live" && request.method === "GET") {
+        return sendJson(response, 200, { status: "ok" });
+      }
+
+      if (url.pathname === "/health/ready" && request.method === "GET") {
+        try {
+          database.prepare("SELECT 1 AS ok").get();
+          return sendJson(response, 200, { status: "ok", database: "ok" });
+        } catch (error) {
+          logger.error("health.ready.db_failure", { requestId, error: error.message });
+          return sendJson(response, 503, { status: "unavailable", database: "unavailable" });
+        }
+      }
+
+      if (!enforceRateLimit(rateLimiters, url, request, response)) return;
 
       if (url.pathname === "/api/auth/request-code" && request.method === "POST") {
         const payload = await customerAuth.requestCode(await readJsonBody(request));
@@ -133,15 +178,43 @@ export function createApp({
         const orderBody = session
           ? {
             ...body,
-            firstName: body.firstName || session.account.firstName,
-            lastName: body.lastName || session.account.lastName,
-            phone: body.phone || session.account.phone,
-            email: body.email || session.account.email,
+            firstName: session.account.firstName,
+            lastName: session.account.lastName,
+            phone: session.account.phone,
+            email: session.account.email,
           }
           : body;
-        return sendJson(response, 201, {
-          order: orders.createOrder(orderBody, { customerId: session?.account.id || null }),
-        });
+        const idempotencyKey = readIdempotencyKey(request);
+        const scope = session?.account.id
+          ? `customer:${session.account.id}`
+          : `anonymous:${resolveClientIp(request)}:${String(orderBody.phone || "").slice(0, 30)}`;
+
+        if (idempotencyKey) {
+          const existing = idempotencyStore.get(scope, idempotencyKey);
+          if (existing?.status === "done") {
+            return sendJson(response, 201, existing.response, { "Idempotent-Replay": "true" });
+          }
+          if (existing?.status === "in_flight") {
+            return sendJson(response, 409, {
+              error: {
+                code: "IDEMPOTENCY_IN_FLIGHT",
+                message: "Une commande avec cette clé est déjà en cours de traitement.",
+              },
+            });
+          }
+          idempotencyStore.beginOrGet(scope, idempotencyKey);
+        }
+
+        try {
+          const payload = {
+            order: orders.createOrder(orderBody, { customerId: session?.account.id || null }),
+          };
+          if (idempotencyKey) idempotencyStore.complete(scope, idempotencyKey, payload);
+          return sendJson(response, 201, payload);
+        } catch (error) {
+          if (idempotencyKey) idempotencyStore.release(scope, idempotencyKey);
+          throw error;
+        }
       }
 
       if (url.pathname === "/api/account/orders" && request.method === "GET") {
@@ -544,7 +617,12 @@ export function createApp({
         });
       }
 
-      console.error(error);
+      logger.error("server.internal_error", {
+        requestId,
+        method: request.method,
+        path: url?.pathname,
+        error: error.message,
+      });
       return sendJson(response, 500, {
         error: {
           code: "INTERNAL_ERROR",
@@ -562,8 +640,9 @@ function assertAdminAuthorized(request, requiredAdminToken) {
   // GALATEE_ADMIN_TOKEN before exposing this server publicly.
   if (!requiredAdminToken) return;
 
-  const expectedHeader = `Bearer ${requiredAdminToken}`;
-  if (request.headers.authorization !== expectedHeader) {
+  const header = String(request.headers.authorization || "");
+  const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!safeTokenCompare(provided, requiredAdminToken)) {
     const error = new Error("Admin authorization is required.");
     error.code = "ADMIN_UNAUTHORIZED";
     throw error;
@@ -576,15 +655,27 @@ function requireCustomerSession(customerAuth, request) {
   throw new CustomerAuthError("AUTH_UNAUTHORIZED", "A customer account is required.", 401);
 }
 
-function applyCorsHeaders(response, origin) {
-  const normalizedOrigin = String(origin || "*").trim() || "*";
-  response.setHeader("Access-Control-Allow-Origin", normalizedOrigin);
-  response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (normalizedOrigin !== "*") {
-    response.setHeader("Access-Control-Allow-Credentials", "true");
-    response.setHeader("Vary", "Origin");
+function enforceRateLimit(limiters, url, request, response) {
+  const { method } = request;
+  const { pathname } = url;
+  if (method === "POST") {
+    if (
+      pathname === "/api/auth/login"
+      || pathname === "/api/auth/signup"
+      || pathname === "/api/auth/request-code"
+      || pathname === "/api/auth/request-password-reset"
+      || pathname === "/api/auth/confirm-password-reset"
+      || pathname === "/api/auth/verify-code"
+    ) return applyRateLimit(limiters.auth, request, response, "customer-auth");
+    if (pathname === "/api/driver/login") return applyRateLimit(limiters.auth, request, response, "driver-login");
+    if (pathname === "/api/orders") return applyRateLimit(limiters.order, request, response, "order");
+    if (pathname === "/api/analytics/events") return applyRateLimit(limiters.analytics, request, response, "analytics");
+    if (/^\/api\/admin\/menu\/[^/]+\/image$/.test(pathname)) {
+      return applyRateLimit(limiters.upload, request, response, "menu-image");
+    }
   }
+  if (pathname.startsWith("/api/admin/")) return applyRateLimit(limiters.admin, request, response, "admin");
+  return true;
 }
 
 async function serveStatic(pathname, method, response) {
@@ -753,7 +844,19 @@ function sendText(response, status, message) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  if (!adminToken) {
+  if (IS_PRODUCTION) {
+    const missing = [];
+    if (!adminToken) missing.push("GALATEE_ADMIN_TOKEN");
+    try {
+      resolveCorsOrigin(allowedOrigin);
+    } catch {
+      missing.push("GALATEE_ALLOWED_ORIGIN");
+    }
+    if (missing.length) {
+      console.error(`Refusing to start in production: missing env vars: ${missing.join(", ")}.`);
+      process.exit(1);
+    }
+  } else if (!adminToken) {
     console.warn(
       "\nWarning: GALATEE_ADMIN_TOKEN is not set - every /api/admin/* route is " +
       "reachable with no login right now. Fine for local testing; set a real " +
@@ -761,10 +864,29 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     );
   }
 
-  createApp().listen(port, () => {
+  const server = createApp();
+  server.listen(port, () => {
+    logger.info("server.listen", { port, env: NODE_ENV });
     console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
     console.log(`Galatee order server listening on http://localhost:${port}`);
   });
+
+  let shuttingDown = false;
+  function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info("server.shutdown.start", { signal });
+    const forceTimer = setTimeout(() => process.exit(1), 10_000);
+    forceTimer.unref?.();
+    server.close(() => {
+      try { runtimeDatabase.close?.(); } catch (error) { logger.warn("server.shutdown.database_error", { error: error.message }); }
+      clearTimeout(forceTimer);
+      logger.info("server.shutdown.done", { signal });
+      process.exit(0);
+    });
+  }
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 function openSqliteDatabase(pathname) {

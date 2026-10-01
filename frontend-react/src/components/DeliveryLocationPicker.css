@@ -194,16 +194,36 @@
   color: var(--charcoal, #2f3821);
 }
 
-.pbg-loc-selected > p:first-child {
+.pbg-loc-selected-title {
   margin: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.pbg-loc-selected > p:first-child svg {
+.pbg-loc-selected-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pbg-loc-selected-row + .pbg-loc-selected-row {
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--basil, #3a6e42) 20%, transparent);
+}
+
+.pbg-loc-selected-row > p:first-child {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Le preflight Tailwind met les svg en display: block. */
+.pbg-loc-selected-row > p:first-child svg {
+  display: inline-block;
   color: var(--basil, #3a6e42);
+  vertical-align: -2px;
 }
 
 .pbg-loc-accuracy {

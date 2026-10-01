@@ -214,7 +214,8 @@ export default function CheckoutContactPage() {
                   <DeliveryLocationPicker
                     latitude={form.deliveryLatitude}
                     longitude={form.deliveryLongitude}
-                    onChange={({ latitude, longitude }) => mergeForm({ deliveryLatitude: latitude, deliveryLongitude: longitude })}
+                    mapsUrl={form.deliveryMapsUrl}
+                    onChange={mergeForm}
                   />
                 </>
               )}

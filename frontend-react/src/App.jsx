@@ -26,6 +26,7 @@ import { TableModeProvider } from "@/context/TableModeContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { CartProvider } from "@/context/CartContext";
 import { CheckoutFormProvider } from "@/context/CheckoutFormContext";
+import { GeolocationProvider } from "@/context/GeolocationContext";
 import { trackEvent } from "@/lib/api";
 
 // Fallback discret pendant le chargement d un chunk de page. Volontairement
@@ -48,6 +49,8 @@ function ClientSite() {
     <CustomerAuthProvider>
       <CartProvider>
       <CheckoutFormProvider>
+      {/* Demande la position des l arrivee : au checkout la permission est deja tranchee. */}
+      <GeolocationProvider>
       <ToastProvider>
       <TableModeProvider>
         <PageViewTracker />
@@ -80,6 +83,7 @@ function ClientSite() {
         </div>
       </TableModeProvider>
       </ToastProvider>
+      </GeolocationProvider>
       </CheckoutFormProvider>
       </CartProvider>
     </CustomerAuthProvider>

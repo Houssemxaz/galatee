@@ -138,6 +138,11 @@ export class OrderSystem {
     if (!orderColumns.some((column) => column.name === "delivery_longitude")) {
       this.db.exec("ALTER TABLE orders ADD COLUMN delivery_longitude REAL");
     }
+    // Lien Google Maps colle par le client au checkout, ouvert tel quel par le
+    // livreur. Prioritaire sur les coordonnees, puis sur l adresse texte.
+    if (!orderColumns.some((column) => column.name === "delivery_maps_url")) {
+      this.db.exec("ALTER TABLE orders ADD COLUMN delivery_maps_url TEXT");
+    }
     // Migration statuts : simplification a 4 statuts + cancelled.
     // 'preparing' devient 'confirmed' (accepte mais pas encore pret).
     // 'withdrawn' et 'completed' deviennent 'delivered'.
@@ -244,13 +249,13 @@ export class OrderSystem {
       this.db.prepare(`
         INSERT INTO orders (
           id, order_number, customer_id, first_name, last_name, phone, email,
-          delivery_mode, commune_id, commune_name, delivery_address, delivery_latitude, delivery_longitude, payment_method,
+          delivery_mode, commune_id, commune_name, delivery_address, delivery_latitude, delivery_longitude, delivery_maps_url, payment_method,
           status, note, subtotal_cents, delivery_fee_cents, discount_cents, loyalty_reward_id, total_cents, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         order.id, order.orderNumber, order.customerId, order.firstName, order.lastName,
         order.phone, order.email, order.deliveryMode, order.communeId, order.communeName,
-        order.deliveryAddress, order.deliveryLatitude, order.deliveryLongitude, order.paymentMethod, order.status, order.note,
+        order.deliveryAddress, order.deliveryLatitude, order.deliveryLongitude, order.deliveryMapsUrl, order.paymentMethod, order.status, order.note,
         order.subtotalCents, order.deliveryFeeCents, order.discountCents, order.loyaltyRewardId,
         order.totalCents, order.createdAt, order.updatedAt,
       );
@@ -410,6 +415,7 @@ export class OrderSystem {
       deliveryAddress: row.delivery_address,
       deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
       deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
+      deliveryMapsUrl: row.delivery_maps_url || null,
       paymentMethod: row.payment_method,
       status: row.status,
       note: row.note,
@@ -452,13 +458,41 @@ function normalizeOrderInput(input) {
   const note = normalizeOptionalText(input.note, 500);
   const loyaltyRewardId = normalizeOptionalText(input.loyaltyRewardId, 120);
   const { deliveryLatitude, deliveryLongitude } = normalizeDeliveryCoordinates(input, deliveryMode);
+  const deliveryMapsUrl = normalizeDeliveryMapsUrl(input.deliveryMapsUrl, deliveryMode);
   return {
     firstName, lastName, phone, email, deliveryMode,
     communeId: deliveryMode === "delivery" ? communeId : null,
     deliveryAddress: deliveryMode === "delivery" ? deliveryAddress : "",
-    deliveryLatitude, deliveryLongitude,
+    deliveryLatitude, deliveryLongitude, deliveryMapsUrl,
     items, note, loyaltyRewardId,
   };
+}
+
+// Le livreur ouvre ce lien tel quel : on n accepte que des liens Google Maps
+// en https, jamais une URL arbitraire. Meme regle que isAllowedMapsUrl dans
+// frontend-react/src/lib/googleMapsLink.js.
+const MAPS_URL_MAX_LENGTH = 500;
+
+export function isAllowedMapsUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "maps.app.goo.gl") return true;
+  if (host === "goo.gl") return url.pathname.startsWith("/maps");
+  if (/^maps\.google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host)) return true;
+  if (/^(www\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host)) return url.pathname.startsWith("/maps");
+  return false;
+}
+
+function normalizeDeliveryMapsUrl(value, deliveryMode) {
+  if (deliveryMode !== "delivery") return null;
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  if (text.length > MAPS_URL_MAX_LENGTH || !isAllowedMapsUrl(text)) {
+    throw new OrderError("DELIVERY_MAPS_URL_INVALID", "The delivery link must be a Google Maps link.");
+  }
+  return text;
 }
 
 // Bounding box large autour du grand Alger. Rejette silencieusement toute coordonnee

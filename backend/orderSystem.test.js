@@ -99,6 +99,39 @@ test("stores and returns optional delivery coordinates for delivery orders", (t)
   );
 });
 
+test("stores an optional Google Maps link and rejects any other URL", (t) => {
+  const { menu, orders } = createSystems(t);
+  const item = menu.listPublished()[0];
+  const order = (overrides) => orders.createOrder(body([{ productId: item.id }], overrides));
+  const rejected = (overrides) => assert.throws(
+    () => order(overrides),
+    (error) => error instanceof OrderError && error.code === "DELIVERY_MAPS_URL_INVALID",
+  );
+
+  // Liens complets et liens courts : le livreur les ouvre tels quels.
+  const full = "https://www.google.com/maps/place/Hydra/@36.748,3.035,15z/data=!3d36.7512!4d3.0398";
+  assert.equal(order({ deliveryMapsUrl: full }).deliveryMapsUrl, full);
+  assert.equal(order({ deliveryMapsUrl: " https://maps.app.goo.gl/AbCdEf123 " }).deliveryMapsUrl, "https://maps.app.goo.gl/AbCdEf123");
+  assert.equal(order({ deliveryMapsUrl: "https://maps.google.dz/?q=36.75,3.04" }).deliveryMapsUrl, "https://maps.google.dz/?q=36.75,3.04");
+  assert.equal(orders.getOrder(order({ deliveryMapsUrl: full }).id).deliveryMapsUrl, full);
+
+  // Absent ou vide : null.
+  assert.equal(order({}).deliveryMapsUrl, null);
+  assert.equal(order({ deliveryMapsUrl: "  " }).deliveryMapsUrl, null);
+
+  // Retrait sur place : jamais persiste.
+  assert.equal(order({ deliveryMode: "pickup", deliveryAddress: "", deliveryMapsUrl: full }).deliveryMapsUrl, null);
+
+  // Tout ce qui n est pas un lien Google Maps https est refuse.
+  rejected({ deliveryMapsUrl: "https://evil.example/maps/@36.75,3.04" });
+  rejected({ deliveryMapsUrl: "https://www.google.com.evil.example/maps/@36.75,3.04" });
+  rejected({ deliveryMapsUrl: "https://www.google.com/search?q=hydra" });
+  rejected({ deliveryMapsUrl: "http://www.google.com/maps/@36.75,3.04,17z" });
+  rejected({ deliveryMapsUrl: "javascript:alert(1)" });
+  rejected({ deliveryMapsUrl: "https://goo.gl/abc" });
+  rejected({ deliveryMapsUrl: `https://www.google.com/maps/${"a".repeat(500)}` });
+});
+
 test("keeps commune fees editable and can deactivate a commune", (t) => {
   const { orders } = createSystems(t);
   const updated = orders.updateCommune("hydra", { fee: 750, active: false });

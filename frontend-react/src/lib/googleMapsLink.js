@@ -1,22 +1,47 @@
-// Extraction des coordonnees depuis un lien Google Maps colle par le client.
-// 100 % cote navigateur, sans appel reseau : on ne lit que ce qui est visible
-// dans l URL elle-meme.
+// Lien Google Maps colle par le client au checkout. Le lien est transmis tel
+// quel au livreur, qui l ouvre sur son telephone : c est la priorite n°1 pour
+// trouver l adresse (avant la position exacte, puis l adresse texte).
 //
-// Limite assumee : les liens courts (maps.app.goo.gl, goo.gl/maps) ne
-// contiennent pas les coordonnees. Il faudrait suivre la redirection, ce que
-// le navigateur du client ne peut pas faire (CORS). On les detecte pour
-// afficher un message clair au lieu d un echec silencieux.
+// Cote navigateur on ne fait aucun appel reseau : on verifie que c est bien
+// un lien Google Maps et on lit les coordonnees quand elles sont visibles dans
+// l URL, pour montrer au client le point detecte. Les liens courts
+// (maps.app.goo.gl) ne contiennent pas les coordonnees et le navigateur ne peut
+// pas suivre la redirection (CORS) : ils sont acceptes, mais le client doit les
+// verifier lui-meme en les ouvrant.
 
 // Meme zone que backend/orderSystem.js (ALGIERS_LAT_MIN...) : un point hors
 // de cette boite serait refuse a l envoi de la commande.
 export const DELIVERY_AREA = { latMin: 36.4, latMax: 37.0, lngMin: 2.5, lngMax: 3.6 };
 
-const SHORT_LINK_HOSTS = ["maps.app.goo.gl", "g.co"];
+const MAX_URL_LENGTH = 500;
 const COORD_PAIR = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 
 export function isInDeliveryArea(latitude, longitude) {
   return latitude >= DELIVERY_AREA.latMin && latitude <= DELIVERY_AREA.latMax
     && longitude >= DELIVERY_AREA.lngMin && longitude <= DELIVERY_AREA.lngMax;
+}
+
+// Liens que le livreur peut ouvrir sans risque : Google Maps en https
+// uniquement. Meme regle que isAllowedMapsUrl dans backend/orderSystem.js.
+export function isAllowedMapsUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "maps.app.goo.gl") return true;
+  if (host === "goo.gl") return url.pathname.startsWith("/maps");
+  if (/^maps\.google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host)) return true;
+  if (/^(www\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(host)) return url.pathname.startsWith("/maps");
+  return false;
+}
+
+function isShortLink(url) {
+  const host = url.hostname.toLowerCase();
+  return host === "maps.app.goo.gl" || host === "goo.gl";
+}
+
+export function coordinatesMapsUrl(latitude, longitude) {
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 function toPoint(lat, lng) {
@@ -33,24 +58,10 @@ function pairToPoint(value) {
   return match ? toPoint(match[1], match[2]) : null;
 }
 
-function isGoogleMapsUrl(url) {
-  const host = url.hostname.toLowerCase();
-  // google.com, google.dz, google.fr... et maps.google.<tld>
-  if (/^maps\.google\.[a-z.]+$/.test(host)) return true;
-  if (/^(www\.)?google\.[a-z.]+$/.test(host)) return url.pathname.startsWith("/maps");
-  return false;
-}
-
-function isShortLink(url) {
-  const host = url.hostname.toLowerCase();
-  if (host === "goo.gl") return url.pathname.startsWith("/maps");
-  return SHORT_LINK_HOSTS.includes(host);
-}
-
 // Le client colle parfois un texte de partage complet ("Regarde ici : https://...").
 function extractUrl(text) {
   const match = /https?:\/\/[^\s<>"']+/i.exec(text);
-  if (match) return match[0];
+  if (match) return match[0].replace(/^http:/i, "https:");
   // Lien colle sans le schema : "google.com/maps/@36.7,3.0,17z" ou "maps.app.goo.gl/abc".
   const bare = /(?:^|\s)((?:www\.|maps\.)?(?:google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)[^\s<>"']*)/i.exec(text);
   return bare ? `https://${bare[1]}` : null;
@@ -60,7 +71,8 @@ function extractUrl(text) {
 // le centre de la vue (@lat,lng) d un lien /place/ ; les parametres explicites
 // (q, query, destination, ll) designent directement le point voulu.
 function readCoordinates(url) {
-  const raw = decodeURIComponent(url.href);
+  let raw = url.href;
+  try { raw = decodeURIComponent(raw); } catch { /* garde la forme encodee */ }
 
   const pin = /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(raw);
   if (pin) return toPoint(pin[1], pin[2]);
@@ -71,8 +83,9 @@ function readCoordinates(url) {
   }
 
   // /maps/search/36.75,3.04 ou /maps/place/36.75,3.04 ou /maps/dir//36.75,3.04
-  const segments = url.pathname.split("/").map((part) => decodeURIComponent(part));
-  for (const segment of segments) {
+  for (const part of url.pathname.split("/")) {
+    let segment = part;
+    try { segment = decodeURIComponent(part); } catch { /* segment brut */ }
     const point = pairToPoint(segment);
     if (point) return point;
   }
@@ -83,39 +96,36 @@ function readCoordinates(url) {
   return null;
 }
 
-// Accepte un lien Google Maps complet, ou des coordonnees brutes "lat, lng".
-// Resultats possibles :
+function withArea(url, point) {
+  if (!isInDeliveryArea(point.latitude, point.longitude)) return { status: "out-of-area", ...point };
+  return { status: "ok", url, ...point };
+}
+
+// Accepte un lien Google Maps (complet ou court), ou des coordonnees brutes
+// "lat, lng" (converties en lien Google Maps). Resultats possibles :
 //   { status: "empty" }
-//   { status: "ok", latitude, longitude }
+//   { status: "ok", url, latitude, longitude }  point lisible dans le lien
+//   { status: "short-link", url }               lien court, point non lisible
+//   { status: "no-coordinates", url }           lien complet sans coordonnees
 //   { status: "out-of-area", latitude, longitude }
-//   { status: "short-link" }      lien court, coordonnees non lisibles
-//   { status: "no-coordinates" }  lien Google Maps sans coordonnees visibles
-//   { status: "unrecognized" }    pas un lien Google Maps
+//   { status: "unrecognized" }                  pas un lien Google Maps
+// Seuls "ok", "short-link" et "no-coordinates" portent un `url` transmissible.
 export function parseGoogleMapsLink(input) {
   const text = String(input || "").trim();
   if (!text) return { status: "empty" };
 
   // Coordonnees brutes "36.7503, 3.0441" : c est ce qu affiche l app Google
-  // Maps apres un appui long sur un point, seul moyen simple sur mobile ou le
-  // bouton Partager ne donne qu un lien court.
+  // Maps apres un appui long sur un point.
   const rawPoint = pairToPoint(text);
-  if (rawPoint) return withArea(rawPoint);
+  if (rawPoint) return withArea(coordinatesMapsUrl(rawPoint.latitude, rawPoint.longitude), rawPoint);
 
   const href = extractUrl(text);
-  if (!href) return { status: "unrecognized" };
+  if (!href || href.length > MAX_URL_LENGTH || !isAllowedMapsUrl(href)) return { status: "unrecognized" };
 
-  let url;
-  try { url = new URL(href); } catch { return { status: "unrecognized" }; }
-
-  if (isShortLink(url)) return { status: "short-link" };
-  if (!isGoogleMapsUrl(url)) return { status: "unrecognized" };
+  const url = new URL(href);
+  if (isShortLink(url)) return { status: "short-link", url: href };
 
   const point = readCoordinates(url);
-  if (!point) return { status: "no-coordinates" };
-  return withArea(point);
-}
-
-function withArea(point) {
-  if (!isInDeliveryArea(point.latitude, point.longitude)) return { status: "out-of-area", ...point };
-  return { status: "ok", ...point };
+  if (!point) return { status: "no-coordinates", url: href };
+  return withArea(href, point);
 }

@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   deliveryAddress: "",
   deliveryLatitude: null,
   deliveryLongitude: null,
+  deliveryMapsUrl: "",
   note: "",
   loyaltyRewardId: "",
 };

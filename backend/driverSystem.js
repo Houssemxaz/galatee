@@ -206,7 +206,7 @@ export class DriverSystem {
     const rows = this.db.prepare(`
       SELECT o.id, o.order_number, o.first_name, o.last_name, o.phone,
              o.delivery_mode, o.commune_name, o.delivery_address,
-             o.delivery_latitude, o.delivery_longitude, o.note,
+             o.delivery_latitude, o.delivery_longitude, o.delivery_maps_url, o.note,
              o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents,
              o.status, o.created_at
       FROM orders o
@@ -441,7 +441,7 @@ export class DriverSystem {
     const rows = this.db.prepare(`
       SELECT o.id, o.order_number, o.first_name, o.last_name, o.phone,
              o.delivery_mode, o.commune_name, o.delivery_address,
-             o.delivery_latitude, o.delivery_longitude, o.note,
+             o.delivery_latitude, o.delivery_longitude, o.delivery_maps_url, o.note,
              o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents,
              o.status, o.driver_assigned_at, o.driver_started_at, o.created_at
       FROM orders o
@@ -458,7 +458,7 @@ export class DriverSystem {
     const rows = this.db.prepare(`
       SELECT o.id, o.order_number, o.first_name, o.last_name,
              o.commune_name, o.delivery_address,
-             o.delivery_latitude, o.delivery_longitude,
+             o.delivery_latitude, o.delivery_longitude, o.delivery_maps_url,
              o.subtotal_cents, o.delivery_fee_cents, o.total_cents,
              o.status, o.delivered_at, o.driver_assigned_at, o.created_at
       FROM orders o
@@ -543,6 +543,7 @@ export class DriverSystem {
       // helper (frontend-react/src/lib/maps.js) fonctionne cote livreur.
       deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
       deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
+      deliveryMapsUrl: row.delivery_maps_url || null,
       note: row.note,
       subtotalCents: row.subtotal_cents,
       deliveryFeeCents: row.delivery_fee_cents,
@@ -674,6 +675,7 @@ function mapHistoryRow(row) {
     deliveryAddress: row.delivery_address,
     deliveryLatitude: typeof row.delivery_latitude === "number" ? row.delivery_latitude : null,
     deliveryLongitude: typeof row.delivery_longitude === "number" ? row.delivery_longitude : null,
+    deliveryMapsUrl: row.delivery_maps_url || null,
     subtotalCents: row.subtotal_cents,
     deliveryFeeCents: row.delivery_fee_cents,
     totalCents: row.total_cents,

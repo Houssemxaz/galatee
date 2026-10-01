@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BarChart3, Bike, CheckCircle2, LogOut, MapPin, Package, Phone, RefreshCw,
+  BarChart3, Bike, CheckCircle2, LogOut, MapPin, Navigation, Package, Phone, RefreshCw,
   X, ArrowUpRight, Undo2,
 } from "lucide-react";
 import {
   cancelOrder, deliverOrder, driverLogout, fetchDriverOrders, fetchDriverPool,
   releaseOrder, startDelivery, takeOrder, updateDriverStatus,
 } from "./api";
-import { orderMapsHref } from "@/lib/maps";
+import { LOCATION_SOURCE_LABELS, orderLocationSource, orderMapsHref } from "@/lib/maps";
 
 const POLL_INTERVAL_MS = 8000;
 
@@ -301,6 +301,7 @@ function DeliverDialog({ order, onConfirm, onClose, busy }) {
 }
 
 function PoolOrderCard({ order, busy, onTake }) {
+  const locationSource = orderLocationSource(order);
   const receivedAt = new Date(order.createdAt);
   const minutesAgo = Math.max(0, Math.round((Date.now() - receivedAt.getTime()) / 60000));
   return (
@@ -314,6 +315,11 @@ function PoolOrderCard({ order, busy, onTake }) {
         <MapPin size={13} strokeWidth={2} />
         <span>{order.deliveryAddress}, {order.communeName}</span>
       </p>
+      {locationSource !== "address" && (
+        <p className="pbg-drv-loc-tag">
+          <Navigation size={11} strokeWidth={2.2} /> {LOCATION_SOURCE_LABELS[locationSource]}
+        </p>
+      )}
       <ItemsList items={order.items} />
       <div className="pbg-drv-card-meta">
         <span className={`pbg-drv-kitchen-status is-${order.status}`}>
@@ -337,6 +343,10 @@ function PoolOrderCard({ order, busy, onTake }) {
 function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
   const isReady = order.status === "ready";
   const inTransit = Boolean(order.driverStartedAt);
+  // Priorite : lien Google Maps du client, puis sa position exacte, puis
+  // l adresse + commune en dernier recours (cf. lib/maps.js).
+  const locationSource = orderLocationSource(order);
+  const precise = locationSource !== "address";
 
   return (
     <article className="pbg-drv-card pbg-drv-card-mine">
@@ -348,11 +358,22 @@ function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
       </header>
       <p className="pbg-drv-customer">{order.firstName} {order.lastName}</p>
       <div className="pbg-drv-card-links">
-        <a href={orderMapsHref(order)} target="_blank" rel="noopener noreferrer" className="pbg-drv-link-chip">
-          <MapPin size={13} strokeWidth={2} />
-          <span>{order.deliveryAddress}, {order.communeName}</span>
+        <a
+          href={orderMapsHref(order)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`pbg-drv-link-chip${precise ? " is-precise" : ""}`}
+          data-location-source={locationSource}
+        >
+          {precise ? <Navigation size={13} strokeWidth={2} /> : <MapPin size={13} strokeWidth={2} />}
+          <span>{precise ? LOCATION_SOURCE_LABELS[locationSource] : `${order.deliveryAddress}, ${order.communeName}`}</span>
           <ArrowUpRight size={11} strokeWidth={2} />
         </a>
+        {precise && (
+          // Garde l adresse ecrite pour l etage, le digicode... mais elle ne
+          // sert plus a la navigation.
+          <p className="pbg-drv-address-note">Indications du client : {order.deliveryAddress}, {order.communeName}</p>
+        )}
         <a href={`tel:${order.phone}`} className="pbg-drv-link-chip">
           <Phone size={13} strokeWidth={2} />
           <span>{order.phone}</span>

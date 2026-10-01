@@ -81,3 +81,28 @@ test("driver views expose delivery coordinates so the map link is precise", (t) 
   assert.equal(history[0].deliveryLatitude, 36.75123);
   assert.equal(history[0].deliveryLongitude, 3.04567);
 });
+
+// Meme piege que ci-dessus pour le lien Google Maps colle par le client : les
+// requetes SQL du livreur doivent selectionner delivery_maps_url.
+test("driver views expose the pasted Google Maps link", (t) => {
+  const { menu, orders, drivers } = createSystems(t);
+  const item = menu.listPublished()[0];
+  const link = "https://maps.app.goo.gl/AbCdEf123";
+
+  const withLink = orders.createOrder(orderBody(item.id, { deliveryMapsUrl: link }));
+  orders.updateStatus(withLink.id, "confirmed");
+  const withoutLink = orders.createOrder(orderBody(item.id));
+  orders.updateStatus(withoutLink.id, "confirmed");
+
+  const pool = drivers.listPool();
+  assert.equal(pool.find((o) => o.id === withLink.id).deliveryMapsUrl, link);
+  assert.equal(pool.find((o) => o.id === withoutLink.id).deliveryMapsUrl, null);
+
+  const driver = drivers.create({ firstName: "Yassine", phone: "+213 555 987 654", pin: "1234" });
+  drivers.takeOrder(driver.id, withLink.id);
+  assert.equal(drivers.listActiveOrders(driver.id)[0].deliveryMapsUrl, link);
+
+  orders.updateStatus(withLink.id, "ready");
+  drivers.markDelivered(driver.id, withLink.id);
+  assert.equal(drivers.listHistory(driver.id)[0].deliveryMapsUrl, link);
+});

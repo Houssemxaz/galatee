@@ -1,16 +1,18 @@
 import { expect, test } from "@playwright/test";
 
 // Point exact de livraison sans carte : permission de localisation demandee
-// des l arrivee, puis deux options au checkout (position exacte / lien
-// Google Maps colle). Pour chaque commande on verifie ce que recoit le
-// livreur : lien de navigation exact si un point a ete fourni, sinon
-// recherche textuelle sur l adresse.
+// des l arrivee, puis deux options au checkout (lien Google Maps colle /
+// position exacte). Pour chaque commande on verifie ce que recoit le livreur,
+// par ordre de priorite : 1. lien du client, 2. position exacte, 3. adresse
+// + commune en dernier recours.
 
 const ADMIN_TOKEN = process.env.E2E_ADMIN_TOKEN || "e2e-admin-token-abcdef";
 const DRIVER_PHONE = "+213 555 000 001";
 const DRIVER_PIN = "1234";
 const HYDRA = { latitude: 36.7503, longitude: 3.0441 };
 const GEO_KEY = "galatee.geolocation";
+const FULL_LINK = "https://www.google.com/maps/place/Hydra/@36.748,3.035,15z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d36.7512!4d3.0398!16s";
+const SHORT_LINK = "https://maps.app.goo.gl/AbCdEf123456";
 
 function exactNavigationHref(latitude, longitude) {
   return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
@@ -37,6 +39,10 @@ async function goToCheckout(page, firstName) {
   await expect(page.locator(".leaflet-container")).toHaveCount(0);
 }
 
+async function pasteLink(page, link) {
+  await page.getByRole("textbox", { name: /Coller un lien Google Maps/i }).fill(link);
+}
+
 async function submitOrder(page) {
   const submitPromise = page.waitForResponse(
     (r) => r.url().includes("/api/orders") && r.request().method() === "POST",
@@ -49,8 +55,8 @@ async function submitOrder(page) {
 }
 
 // Confirme la commande cote admin, connecte le livreur, prend la course et
-// renvoie le lien Google Maps affiche sur sa carte.
-async function driverMapsHref(page, request, order) {
+// renvoie le lien de navigation affiche sur sa carte.
+async function driverNavigation(page, request, order) {
   const confirm = await request.patch(`/api/admin/orders/${order.id}/status`, {
     headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
     data: { status: "confirmed" },
@@ -72,7 +78,12 @@ async function driverMapsHref(page, request, order) {
 
   const mineCard = page.locator("article.pbg-drv-card-mine").filter({ hasText: `#${shortNumber}` });
   await expect(mineCard).toBeVisible();
-  return mineCard.locator("a.pbg-drv-link-chip").first().getAttribute("href");
+  const navLink = mineCard.locator("a.pbg-drv-link-chip").first();
+  return {
+    href: await navLink.getAttribute("href"),
+    source: await navLink.getAttribute("data-location-source"),
+    label: (await navLink.innerText()).trim(),
+  };
 }
 
 test.describe("permission de localisation accordee", () => {
@@ -85,57 +96,83 @@ test.describe("permission de localisation accordee", () => {
     expect(stored.position).toMatchObject(HYDRA);
   });
 
-  test("position exacte : coordonnees envoyees, lien de navigation exact pour le livreur", async ({ page, request }) => {
+  test("position exacte seule : le livreur navigue vers la position, pas l adresse", async ({ page, request }) => {
     await goToCheckout(page, "Position");
     await page.getByRole("button", { name: /Utiliser ma position exacte/i }).click();
-    await expect(page.getByText(/Point enregistré \(votre position\)/)).toBeVisible();
+    await expect(page.getByText(/Votre position exacte/)).toBeVisible();
 
     const order = await submitOrder(page);
     expect(order.deliveryLatitude).toBe(HYDRA.latitude);
     expect(order.deliveryLongitude).toBe(HYDRA.longitude);
+    expect(order.deliveryMapsUrl).toBeNull();
 
-    const href = await driverMapsHref(page, request, order);
-    expect(href).toBe(exactNavigationHref(HYDRA.latitude, HYDRA.longitude));
+    const nav = await driverNavigation(page, request, order);
+    expect(nav.source).toBe("position");
+    expect(nav.href).toBe(exactNavigationHref(HYDRA.latitude, HYDRA.longitude));
+    expect(nav.label).toContain("Position exacte du client");
+  });
+
+  test("lien et position fournis : le livreur ouvre le lien en priorite", async ({ page, request }) => {
+    await goToCheckout(page, "Lienposition");
+    await page.getByRole("button", { name: /Utiliser ma position exacte/i }).click();
+    await pasteLink(page, SHORT_LINK);
+    await page.getByRole("button", { name: /Utiliser ce lien/i }).click();
+    await expect(page.getByText(/\(ouvert en priorité\)/)).toBeVisible();
+    await expect(page.getByText(/\(en secours\)/)).toBeVisible();
+
+    const order = await submitOrder(page);
+    expect(order.deliveryMapsUrl).toBe(SHORT_LINK);
+    expect(order.deliveryLatitude).toBe(HYDRA.latitude);
+
+    const nav = await driverNavigation(page, request, order);
+    expect(nav.source).toBe("link");
+    expect(nav.href).toBe(SHORT_LINK);
   });
 });
 
-test("lien Google Maps complet : point detecte, confirme puis transmis au livreur", async ({ page, request }) => {
+test("lien Google Maps complet : point detecte, confirme, ouvert tel quel par le livreur", async ({ page, request }) => {
   await goToCheckout(page, "Lien");
-  const link = "https://www.google.com/maps/place/Hydra/@36.748,3.035,15z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d36.7512!4d3.0398!16s";
-  await page.getByRole("textbox", { name: /Coller un lien Google Maps/i }).fill(link);
+  await pasteLink(page, FULL_LINK);
 
-  // Le point detecte est montre au client mais pas applique tant qu il n a pas confirme.
+  // Le point detecte est montre au client mais rien n est enregistre avant confirmation.
   await expect(page.getByText("36.75120° N, 3.03980° E")).toBeVisible();
   await expect(page.getByText(/Aucun point enregistré/)).toBeVisible();
-  await page.getByRole("button", { name: /Utiliser ce point/i }).click();
-  await expect(page.getByText(/Point enregistré \(lien Google Maps\)/)).toBeVisible();
+  await page.getByRole("button", { name: /Utiliser ce lien/i }).click();
+  await expect(page.getByText(/Votre lien Google Maps/)).toBeVisible();
 
   const order = await submitOrder(page);
-  expect(order.deliveryLatitude).toBe(36.7512);
-  expect(order.deliveryLongitude).toBe(3.0398);
-
-  const href = await driverMapsHref(page, request, order);
-  expect(href).toBe(exactNavigationHref(36.7512, 3.0398));
-});
-
-test("lien court maps.app.goo.gl : message clair, aucune coordonnee envoyee", async ({ page, request }) => {
-  await goToCheckout(page, "Court");
-  await page.getByRole("textbox", { name: /Coller un lien Google Maps/i }).fill("https://maps.app.goo.gl/AbCdEf123456");
-
-  await expect(page.getByText(/ne sont pas pris en charge/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Utiliser ce point/i })).toHaveCount(0);
-  await expect(page.getByText(/Aucun point enregistré/)).toBeVisible();
-
-  const order = await submitOrder(page);
+  expect(order.deliveryMapsUrl).toBe(FULL_LINK);
   expect(order.deliveryLatitude).toBeNull();
-  expect(order.deliveryLongitude).toBeNull();
 
-  // Sans point exact, le livreur garde la recherche sur l adresse texte.
-  const href = await driverMapsHref(page, request, order);
-  expect(href).toMatch(/^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Adresse%20Court/);
+  const nav = await driverNavigation(page, request, order);
+  expect(nav.source).toBe("link");
+  expect(nav.href).toBe(FULL_LINK);
+  expect(nav.label).toContain("Lien Google Maps du client");
 });
 
-test("permission refusee : message au checkout, le lien reste possible", async ({ page }) => {
+test("lien court maps.app.goo.gl : accepte apres verification, transmis au livreur", async ({ page, request }) => {
+  await goToCheckout(page, "Court");
+  await pasteLink(page, SHORT_LINK);
+  await expect(page.getByText(/Lien court Google Maps reconnu/)).toBeVisible();
+  await page.getByRole("button", { name: /Utiliser ce lien/i }).click();
+
+  const order = await submitOrder(page);
+  expect(order.deliveryMapsUrl).toBe(SHORT_LINK);
+
+  const nav = await driverNavigation(page, request, order);
+  expect(nav.source).toBe("link");
+  expect(nav.href).toBe(SHORT_LINK);
+});
+
+test("lien non Google Maps : refuse avec un message, rien n est envoye", async ({ page }) => {
+  await goToCheckout(page, "Invalide");
+  await pasteLink(page, "https://evil.example/maps/@36.75,3.04,17z");
+  await expect(page.getByText(/Lien non reconnu/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Utiliser ce lien/i })).toHaveCount(0);
+  await expect(page.getByText(/Aucun point enregistré/)).toBeVisible();
+});
+
+test("permission refusee et pas de lien : adresse et commune en dernier recours", async ({ page, request }) => {
   await page.goto("/");
   await expect.poll(async () => (await readGeolocationStore(page))?.status).toBe("denied");
 
@@ -143,6 +180,15 @@ test("permission refusee : message au checkout, le lien reste possible", async (
   await page.getByRole("button", { name: /Utiliser ma position exacte/i }).click();
   await expect(page.getByText(/Localisation refusée\. Autorisez-la/)).toBeVisible();
   await expect(page.getByText(/Aucun point enregistré/)).toBeVisible();
+
+  const order = await submitOrder(page);
+  expect(order.deliveryMapsUrl).toBeNull();
+  expect(order.deliveryLatitude).toBeNull();
+
+  const nav = await driverNavigation(page, request, order);
+  expect(nav.source).toBe("address");
+  expect(nav.href).toMatch(/^https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Adresse%20Refus/);
+  expect(nav.label).toContain("Adresse Refus, Hydra");
 });
 
 test("demande automatique ignoree par le navigateur : relancee au premier geste", async ({ page }) => {

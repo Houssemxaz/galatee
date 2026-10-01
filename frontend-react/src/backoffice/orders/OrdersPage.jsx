@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
 import { Slideover, EmptyState, SkeletonRows } from "../shared/primitives.jsx";
-import { hasPreciseLocation, orderMapsHref } from "@/lib/maps";
+import { orderLocationSource, orderMapsHref } from "@/lib/maps";
+
+const MAPS_LINK_LABELS = {
+  link: "Ouvrir le lien Google Maps du client",
+  position: "Ouvrir la navigation Google Maps (position exacte)",
+  address: "Ouvrir la recherche Google Maps",
+};
 
 const STATUS_META = {
   pending: ["En attente", "warn"],
@@ -409,7 +415,7 @@ export default function OrdersPage() {
                   rel="noopener noreferrer"
                   style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--bo-accent, currentColor)" }}
                 >
-                  <span>{hasPreciseLocation(expanded) ? "Ouvrir la navigation Google Maps (point exact)" : "Ouvrir la recherche Google Maps"}</span>
+                  <span>{MAPS_LINK_LABELS[orderLocationSource(expanded)]}</span>
                   <ArrowUpRight size={11} strokeWidth={2} />
                 </a>
               </p>

@@ -283,6 +283,40 @@
 .pbg-drv-link-chip svg:first-child { color: var(--drv-accent); flex-shrink: 0; }
 .pbg-drv-link-chip svg:last-child { color: var(--drv-ink-muted); margin-left: auto; }
 
+/* Lien precis (lien Google Maps ou position exacte du client) : mis en avant
+   par rapport a l adresse texte, qui n est plus qu un dernier recours. */
+.pbg-drv-link-chip.is-precise {
+  background: var(--drv-basil);
+  border-color: var(--drv-basil-dark);
+  color: var(--drv-paper);
+  font-weight: 600;
+}
+.pbg-drv-link-chip.is-precise:hover, .pbg-drv-link-chip.is-precise:active { background: var(--drv-basil-dark); }
+.pbg-drv-link-chip.is-precise svg:first-child,
+.pbg-drv-link-chip.is-precise svg:last-child { color: var(--drv-paper); }
+
+.pbg-drv-address-note {
+  margin: -2px 0 0;
+  padding: 0 4px;
+  color: var(--drv-ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pbg-drv-loc-tag {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--drv-basil) 12%, transparent);
+  color: var(--drv-basil-dark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .pbg-drv-items {
   list-style: none;
   margin: 0;

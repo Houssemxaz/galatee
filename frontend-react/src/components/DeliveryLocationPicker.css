@@ -1,115 +1,223 @@
-.pbg-map-picker {
+/* Point exact de livraison : deux options cote a cote, sans carte. Les champs
+   (label > span, input) heritent des styles .order-form de App.css. */
+
+.pbg-loc-picker {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin-top: 8px;
 }
 
-.pbg-map-picker-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.pbg-map-picker-copy {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.pbg-map-picker-title {
+.pbg-loc-title {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--charcoal, #2a2a2a);
+  color: var(--charcoal, #2f3821);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin: 0 0 2px;
 }
 
-.pbg-map-picker-title small {
-  font-weight: 400;
-  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 55%, transparent);
-  font-size: 0.75rem;
-  margin-left: 4px;
-}
-
-.pbg-map-picker-hint {
+.pbg-loc-hint,
+.pbg-loc-note,
+.pbg-loc-empty {
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 65%, transparent);
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--charcoal, #2f3821) 65%, transparent);
   margin: 0;
-  line-height: 1.4;
 }
 
-.pbg-map-picker-actions {
-  display: inline-flex;
-  gap: 6px;
-  flex-wrap: wrap;
+.pbg-loc-empty {
+  font-style: italic;
 }
 
-.pbg-map-picker-btn {
+.pbg-loc-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pbg-loc-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--charcoal, #2f3821) 12%, transparent);
+  background: color-mix(in srgb, var(--charcoal, #2f3821) 3%, var(--paper, #f5efe4));
+  min-width: 0;
+}
+
+/* Meme typo que les labels .order-form pour aligner les deux colonnes. */
+.pbg-loc-option-title {
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--charcoal, #2f3821);
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--charcoal, #2a2a2a) 15%, transparent);
-  background: var(--paper, #fbf7ef);
-  color: var(--charcoal, #2a2a2a);
-  font-size: 0.78rem;
-  font-weight: 500;
+  margin: 0;
+}
+
+.pbg-loc-link > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pbg-loc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--charcoal, #2f3821);
+  background: var(--charcoal, #2f3821);
+  color: var(--paper, #f5efe4);
+  font-family: var(--body);
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
 }
 
-.pbg-map-picker-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--charcoal, #2a2a2a) 6%, var(--paper, #fbf7ef));
+.pbg-loc-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--charcoal, #2f3821) 85%, black);
 }
 
-.pbg-map-picker-btn:disabled {
+.pbg-loc-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pbg-loc-btn:disabled {
   opacity: 0.6;
-  cursor: default;
+  cursor: progress;
 }
 
-.pbg-map-picker-btn-ghost {
-  background: transparent;
+.pbg-loc-btn:focus-visible,
+.pbg-loc-verify:focus-visible {
+  outline: 2px solid var(--accent, #d0362b);
+  outline-offset: 2px;
 }
 
-.pbg-map-picker-canvas {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--charcoal, #2a2a2a) 12%, transparent);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.pbg-map-picker-coords {
+.pbg-loc-btn-small {
+  padding: 6px 11px;
+  border-radius: 999px;
   font-size: 0.78rem;
-  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 70%, transparent);
+}
+
+.pbg-loc-btn-ghost {
+  background: transparent;
+  color: var(--charcoal, #2f3821);
+  border-color: color-mix(in srgb, var(--charcoal, #2f3821) 25%, transparent);
+}
+
+.pbg-loc-btn-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--charcoal, #2f3821) 6%, transparent);
+}
+
+.pbg-loc-feedback {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.pbg-loc-feedback p {
   margin: 0;
 }
 
-.pbg-map-picker-coords b {
-  color: var(--charcoal, #2a2a2a);
+.pbg-loc-feedback b,
+.pbg-loc-selected b {
   font-variant-numeric: tabular-nums;
 }
 
-.pbg-map-picker-coords-muted {
-  font-style: italic;
+.pbg-loc-feedback.is-ok {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: color-mix(in srgb, var(--basil, #3a6e42) 10%, var(--paper, #f5efe4));
+  color: var(--charcoal, #2f3821);
 }
 
-.pbg-map-picker-error {
-  font-size: 0.75rem;
-  color: var(--accent, #c94a3a);
-  margin: 0;
+.pbg-loc-feedback.is-error {
+  background: color-mix(in srgb, var(--accent, #d0362b) 8%, var(--paper, #f5efe4));
+  color: color-mix(in srgb, var(--accent, #d0362b) 80%, black);
 }
 
-.pbg-map-picker-loading {
-  padding: 16px;
+.pbg-loc-feedback.is-warn {
+  background: color-mix(in srgb, var(--gold, #e8a652) 18%, var(--paper, #f5efe4));
+  color: var(--charcoal, #2f3821);
+}
+
+.pbg-loc-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.pbg-loc-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--charcoal, #2f3821);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pbg-loc-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--basil, #3a6e42);
+}
+
+.pbg-loc-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--charcoal, #2a2a2a) 4%, var(--paper, #fbf7ef));
-  color: color-mix(in srgb, var(--charcoal, #2a2a2a) 60%, transparent);
-  font-size: 0.85rem;
-  text-align: center;
+  border: 1.5px solid color-mix(in srgb, var(--basil, #3a6e42) 45%, transparent);
+  background: color-mix(in srgb, var(--basil, #3a6e42) 7%, var(--paper, #f5efe4));
+  font-size: 0.82rem;
+  color: var(--charcoal, #2f3821);
+}
+
+.pbg-loc-selected > p:first-child {
   margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pbg-loc-selected > p:first-child svg {
+  color: var(--basil, #3a6e42);
+}
+
+.pbg-loc-accuracy {
+  color: color-mix(in srgb, var(--charcoal, #2f3821) 65%, transparent);
+}
+
+@media (max-width: 640px) {
+  .pbg-loc-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pbg-loc-btn {
+    transition: none;
+  }
 }

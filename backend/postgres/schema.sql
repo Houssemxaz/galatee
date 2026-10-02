@@ -229,6 +229,8 @@ CREATE TABLE IF NOT EXISTS orders (
   delivered_at TEXT,
   delivery_latitude DOUBLE PRECISION,
   delivery_longitude DOUBLE PRECISION,
+  -- Lien Google Maps colle par le client, ouvert tel quel par le livreur.
+  delivery_maps_url TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CHECK (delivery_latitude IS NULL OR delivery_latitude BETWEEN -90 AND 90),

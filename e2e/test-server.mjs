@@ -16,6 +16,12 @@ process.env.GALATEE_DB_PATH = dbPath;
 process.env.GALATEE_UPLOAD_DIR = uploadRoot;
 process.env.GALATEE_ADMIN_TOKEN = adminToken;
 process.env.GALATEE_ALLOWED_ORIGIN = `http://127.0.0.1:${port}`;
+// Toute la suite tourne depuis la meme IP en moins d une minute : les limites
+// de prod (8 commandes/min, 20 connexions/15 min) bloqueraient les derniers
+// tests en 429. Relevees ici uniquement ; le rate limiting reste teste par
+// backend/rateLimit.test.js et serverHardening.test.js.
+process.env.RL_ORDER_MAX ||= "1000";
+process.env.RL_AUTH_MAX ||= "1000";
 
 const { createApp } = await import(new URL("../backend/server.js", import.meta.url));
 const { MenuSystem } = await import(new URL("../backend/menuSystem.js", import.meta.url));

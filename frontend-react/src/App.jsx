@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import TableModeBanner from "@/components/TableModeBanner";
@@ -21,6 +21,9 @@ const OrdersHistoryPage = lazy(() => import("@/pages/OrdersHistoryPage"));
 const PastaLoverClubPage = lazy(() => import("@/pages/PastaLoverClubPage"));
 const TableEntryPage = lazy(() => import("@/pages/TableEntryPage"));
 const DriverApp = lazy(() => import("@/driver/DriverApp"));
+import AccountProfilePage from "@/pages/account/AccountProfilePage";
+import AccountLoyaltyPage from "@/pages/account/AccountLoyaltyPage";
+import AccountPreferencesPage from "@/pages/account/AccountPreferencesPage";
 import { CustomerAuthProvider } from "@/context/CustomerAuthContext";
 import { TableModeProvider } from "@/context/TableModeContext";
 import { ToastProvider } from "@/context/ToastContext";
@@ -68,10 +71,12 @@ function ClientSite() {
                 <Route path="/menu/:slug" element={<DishPage />} />
                 <Route path="/commande" element={<OrderPage />} />
                 <Route path="/commande/coordonnees" element={<CheckoutContactPage />} />
-                <Route path="/reservation" element={<Navigate to="/commande" replace />} />
                 <Route path="/pasta-lover-club" element={<PastaLoverClubPage />} />
                 <Route path="/compte" element={<AccountPage />} />
+                <Route path="/compte/profil" element={<AccountProfilePage />} />
+                <Route path="/compte/fidelite" element={<AccountLoyaltyPage />} />
                 <Route path="/compte/commandes" element={<OrdersHistoryPage />} />
+                <Route path="/compte/preferences" element={<AccountPreferencesPage />} />
                 <Route path="/informations" element={<InformationsPage />} />
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="*" element={<NotFoundPage />} />

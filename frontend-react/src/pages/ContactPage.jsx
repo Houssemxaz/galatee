@@ -35,7 +35,7 @@ export default function ContactPage() {
         description="Contactez Pasta by Galatée à Hydra, Alger. Réponse du mercredi au samedi — téléphone, email bonjour@galatee.dz, ou Instagram @pasta.bygalatee."
         path="/contact"
       />
-      <section className="pbg-page-header pbg-page-header-contact">
+      <section className="pbg-page-header pbg-page-header-contact" data-page-number="05">
         <div className="pbg-page-shell">
           <p className="pbg-page-mark"><span>05</span><i /><em>Contact</em></p>
           <h1 className="pbg-page-title">
@@ -51,11 +51,17 @@ export default function ContactPage() {
         </div>
       </section>
 
-      <section className="pbg-page-shell pbg-contact-section">
+      <section className="pbg-page-shell pbg-contact-section" style={{ position: "relative" }}>
         <div className="pbg-contact-directory-head">
           <p>Trois façons de nous trouver</p>
           <span>Réponse du mercredi au samedi</span>
         </div>
+
+        {/* Note flottante manuscrite - desktop uniquement (visible dans .pbg-floating-note desktop-editorial.css) */}
+        <aside className="pbg-floating-note pbg-floating-note-contact" aria-hidden="true">
+          <p className="pbg-floating-note-title">P.S.</p>
+          <p className="pbg-floating-note-body">Une allergie ? Dites-le nous — on adapte à la carte.</p>
+        </aside>
         {CHANNELS.map((channel, index) => (
           <Reveal key={channel.n} className="pbg-contact-row" delay={index * 90}>
             <div className="pbg-contact-row-index" aria-hidden="true">{channel.n}</div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight, Check, Gift, LogOut, Mail, MapPin, Phone, Sparkles, UserPlus,
   UtensilsCrossed, ClipboardList, ShoppingBag, HeartHandshake, Repeat2, Utensils,
-  Calendar,
+  Calendar, User, ShieldCheck,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
@@ -504,8 +504,89 @@ export default function AccountPage() {
         </div>
       </section>
 
+      {/* Hub desktop uniquement : 4 gros cards rouges vers les sous-pages */}
+      <section className="pbg-account-hub-section" aria-label="Sections du compte">
+        <div className="pbg-page-shell pbg-account-hub-shell">
+          <Reveal className="pbg-account-hub-card pbg-account-hub-card-bordeaux" delay={0}>
+            <Link to="/compte/profil" className="pbg-account-hub-link">
+              <span className="pbg-account-hub-index" aria-hidden="true">01</span>
+              <span className="pbg-account-hub-icon" aria-hidden="true"><User size={22} strokeWidth={1.6} /></span>
+              <div className="pbg-account-hub-body">
+                <p className="pbg-account-hub-label">Coordonnées</p>
+                <p className="pbg-account-hub-value">Votre carnet</p>
+                <p className="pbg-account-hub-note">Email, téléphone, commune — vos infos de contact.</p>
+              </div>
+              <span className="pbg-account-hub-cta" aria-hidden="true">
+                <span>Ouvrir</span>
+                <ArrowUpRight size={16} strokeWidth={1.7} />
+              </span>
+            </Link>
+          </Reveal>
+
+          <Reveal className="pbg-account-hub-card pbg-account-hub-card-tomato" delay={80}>
+            <Link to="/compte/fidelite" className="pbg-account-hub-link">
+              <span className="pbg-account-hub-index" aria-hidden="true">02</span>
+              <span className="pbg-account-hub-icon" aria-hidden="true"><Gift size={22} strokeWidth={1.6} /></span>
+              <div className="pbg-account-hub-body">
+                <p className="pbg-account-hub-label">Fidélité</p>
+                <p className="pbg-account-hub-value">
+                  {loyalty?.rewardAvailable ? "Récompense prête" : "Progression"}
+                </p>
+                <p className="pbg-account-hub-note">
+                  {loyalty?.rewardAvailable
+                    ? "Votre promo est débloquée — pensez à la mentionner."
+                    : "10 commandes = 1 récompense. Suivez votre carte."}
+                </p>
+              </div>
+              <span className="pbg-account-hub-cta" aria-hidden="true">
+                <span>Ouvrir</span>
+                <ArrowUpRight size={16} strokeWidth={1.7} />
+              </span>
+            </Link>
+          </Reveal>
+
+          <Reveal className="pbg-account-hub-card pbg-account-hub-card-ember" delay={160}>
+            <Link to="/compte/commandes" className="pbg-account-hub-link">
+              <span className="pbg-account-hub-index" aria-hidden="true">03</span>
+              <span className="pbg-account-hub-icon" aria-hidden="true"><ClipboardList size={22} strokeWidth={1.6} /></span>
+              <div className="pbg-account-hub-body">
+                <p className="pbg-account-hub-label">Commandes</p>
+                <p className="pbg-account-hub-value">
+                  {orders.length > 0 ? `${orders.length} au total` : "Historique"}
+                </p>
+                <p className="pbg-account-hub-note">
+                  {lastOrder
+                    ? `Dernière : ${new Date(lastOrder.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}`
+                    : "Retrouvez toutes vos commandes ici."}
+                </p>
+              </div>
+              <span className="pbg-account-hub-cta" aria-hidden="true">
+                <span>Ouvrir</span>
+                <ArrowUpRight size={16} strokeWidth={1.7} />
+              </span>
+            </Link>
+          </Reveal>
+
+          <Reveal className="pbg-account-hub-card pbg-account-hub-card-ink" delay={240}>
+            <Link to="/compte/preferences" className="pbg-account-hub-link">
+              <span className="pbg-account-hub-index" aria-hidden="true">04</span>
+              <span className="pbg-account-hub-icon" aria-hidden="true"><ShieldCheck size={22} strokeWidth={1.6} /></span>
+              <div className="pbg-account-hub-body">
+                <p className="pbg-account-hub-label">Préférences</p>
+                <p className="pbg-account-hub-value">Session & données</p>
+                <p className="pbg-account-hub-note">Rester connecté, déconnexion, confidentialité.</p>
+              </div>
+              <span className="pbg-account-hub-cta" aria-hidden="true">
+                <span>Ouvrir</span>
+                <ArrowUpRight size={16} strokeWidth={1.7} />
+              </span>
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
       <section className="pbg-account-body">
-        <div className="pbg-page-shell">
+        <div className="pbg-page-shell pbg-account-body-shell">
           <Reveal className="pbg-carnet-card">
             <div className="pbg-carnet-head">
               <p className="pbg-carnet-eyebrow">Votre carnet</p>
@@ -544,13 +625,6 @@ export default function AccountPage() {
               <LogOut size={13} strokeWidth={1.7} /> Se déconnecter
             </button>
           </Reveal>
-
-          {/* Colonne droite - affichee uniquement en desktop (CSS gere le hidden mobile) */}
-          <aside className="pbg-account-aside" aria-label="Vos infos rapides">
-            <Reveal delay={100}><StampPreview loyalty={loyalty} /></Reveal>
-            {lastOrder && <Reveal delay={180}><LastOrderCard order={lastOrder} onReorder={reorder} /></Reveal>}
-            <Reveal delay={260}><QuickShortcuts /></Reveal>
-          </aside>
         </div>
       </section>
     </div>

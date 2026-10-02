@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, ShoppingBag, UserX, X } from "lucide-react";
+import { Bell, Bike, Check, ChevronDown, ChevronRight, Inbox, MapPin, Phone, RefreshCw, RotateCcw, ShoppingBag, UserX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiMessage, apiRequest } from "../api";
@@ -19,6 +19,20 @@ const STATUS_META = {
   delivered: ["Livrée", "muted"],
   cancelled: ["Annulée", "muted"],
 };
+const CANCELLATION_REASONS = [
+  "Le client n’a pas confirmé sa commande",
+  "Le client a annulé sa commande",
+  "Rupture de stock",
+  "Client injoignable",
+  "Zone de livraison indisponible",
+];
+const CORRECTION_STATUSES = [
+  ["pending", "En attente"],
+  ["confirmed", "Confirmée"],
+  ["ready", "Prête"],
+  ["delivered", "Livrée"],
+  ["cancelled", "Annulée"],
+];
 
 function formatDzd(cents) { return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`; }
 function formatDate(value) { return value ? new Date(value).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"; }
@@ -40,13 +54,16 @@ export default function OrdersPage() {
   const [alert, setAlert] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [actionId, setActionId] = useState(null);
+  const [cancelFormOpen, setCancelFormOpen] = useState(false);
+  const [cancelReasonChoice, setCancelReasonChoice] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [correctionFormOpen, setCorrectionFormOpen] = useState(false);
+  const [correctionStatus, setCorrectionStatus] = useState("");
   const [drivers, setDrivers] = useState([]);
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [notificationMessage, setNotificationMessage] = useState("");
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const knownPendingRef = useRef(null);
   const audioRef = useRef(null);
-  // Miroir ref du state pour lecture synchrone depuis notifyNewOrders (capture par load()).
   const audioUnlockedRef = useRef(false);
 
   function ensureAudio() {
@@ -84,7 +101,6 @@ export default function OrdersPage() {
         audio.pause();
         audio.currentTime = 0;
         audioUnlockedRef.current = true;
-        setAudioUnlocked(true);
       } catch { /* autoplay peut echouer si le geste est trop indirect — on retentera au prochain clic */ }
     }
     if (typeof Notification === "undefined") return;
@@ -124,6 +140,13 @@ export default function OrdersPage() {
     } catch { /* silencieux : la page ordres reste utilisable sans livreurs */ }
   }, []);
   useEffect(() => { loadDrivers(); }, [loadDrivers]);
+  useEffect(() => {
+    setCancelFormOpen(false);
+    setCancelReasonChoice("");
+    setCancelReason("");
+    setCorrectionFormOpen(false);
+    setCorrectionStatus("");
+  }, [expanded?.id]);
 
   async function assignDriver(order, driverId) {
     setActionId(`${order.id}:assign`);
@@ -191,15 +214,43 @@ export default function OrdersPage() {
     [orders]
   );
 
-  async function updateStatus(order, status) {
+  async function updateStatus(order, status, note = "") {
     setActionId(`${order.id}:${status}`);
     try {
-      const payload = await apiRequest(`/admin/orders/${encodeURIComponent(order.id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      const payload = await apiRequest(`/admin/orders/${encodeURIComponent(order.id)}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, ...(note.trim() ? { note: note.trim() } : {}) }),
+      });
       setOrders((current) => current.map((item) => item.id === order.id ? payload.order : item));
       setExpanded(payload.order);
+      setCancelFormOpen(false);
+      setCancelReason("");
       setAlert({ kind: "success", message: `Commande ${payload.order.orderNumber} mise à jour.` });
     } catch (error) { setAlert({ kind: "error", message: apiMessage(error, "Le changement de statut a échoué.") }); }
     finally { setActionId(null); }
+  }
+
+  async function correctStatus(order) {
+    if (!correctionStatus || correctionStatus === order.status) return;
+    setActionId(`${order.id}:correction`);
+    try {
+      const payload = await apiRequest(`/admin/orders/${encodeURIComponent(order.id)}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: correctionStatus,
+          correction: true,
+        }),
+      });
+      setOrders((current) => current.map((item) => item.id === order.id ? payload.order : item));
+      setExpanded(payload.order);
+      setCorrectionFormOpen(false);
+      setCorrectionStatus("");
+      setAlert({ kind: "success", message: `Statut corrigé : ${payload.order.orderNumber}.` });
+    } catch (error) {
+      setAlert({ kind: "error", message: apiMessage(error, "La correction du statut a échoué.") });
+    } finally {
+      setActionId(null);
+    }
   }
 
   return <div className="bo-page">
@@ -270,9 +321,9 @@ export default function OrdersPage() {
         <Input placeholder="N° commande, client, téléphone…" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       <Button variant="outline" size="sm" onClick={load} aria-label="Rafraîchir les commandes"><RefreshCw size={14} /></Button>
-      {!audioUnlocked && (
-        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer le son de nouvelle commande (et les notifications navigateur si supportees)">
-          <Bell size={14} /> <span>Activer les alertes sonores</span>
+      {notificationPermission !== "granted" && notificationPermission !== "unsupported" && (
+        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer les notifications de nouvelles commandes">
+          <Bell size={14} /> <span>Activer les alertes</span>
         </Button>
       )}
     </section>
@@ -368,17 +419,32 @@ export default function OrdersPage() {
         const action = nextAction(expanded);
         return (
           <>
-            {["pending", "confirmed"].includes(expanded.status) && (
-              <Button variant="outline" onClick={() => updateStatus(expanded, "cancelled")} disabled={actionId === `${expanded.id}:cancelled`}>
-                <X size={14} /> Annuler
+            {correctionFormOpen ? (
+              <Button variant="outline" type="button" onClick={() => { setCorrectionFormOpen(false); setCorrectionStatus(""); }}>
+                Retour
+              </Button>
+            ) : (
+              <Button variant="outline" type="button" onClick={() => { setCorrectionFormOpen(true); setCancelFormOpen(false); setCorrectionStatus(""); }}>
+                <RotateCcw size={14} /> Corriger le statut
               </Button>
             )}
-            {expanded.status === "pending" && (
+            {!correctionFormOpen && ["pending", "confirmed"].includes(expanded.status) && (
+              cancelFormOpen && !correctionFormOpen ? (
+                <Button variant="outline" type="button" onClick={() => { setCancelFormOpen(false); setCancelReasonChoice(""); setCancelReason(""); }}>
+                  Retour
+                </Button>
+              ) : (
+                <Button variant="outline" type="button" onClick={() => { setCancelFormOpen(true); setCorrectionFormOpen(false); }}>
+                  <X size={14} /> Annuler
+                </Button>
+              )
+            )}
+            {!correctionFormOpen && expanded.status === "pending" && (
               <Button className="bo-action-confirm" onClick={() => updateStatus(expanded, "confirmed")} disabled={actionId === `${expanded.id}:confirmed`}>
                 <Check size={14} /> Confirmer après appel
               </Button>
             )}
-            {action && expanded.status !== "pending" && (
+            {!correctionFormOpen && action && expanded.status !== "pending" && (
               <Button onClick={() => updateStatus(expanded, action[0])} disabled={actionId === `${expanded.id}:${action[0]}`}>
                 <Check size={14} /> {action[1]}
               </Button>
@@ -394,6 +460,86 @@ export default function OrdersPage() {
             <span className="bo-order-sheet-total">{formatDzd(expanded.totalCents)}</span>
           </div>
 
+          {cancelFormOpen && ["pending", "confirmed"].includes(expanded.status) && (
+            <form
+              className="bo-order-cancel-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const reason = cancelReasonChoice === "Autre" ? cancelReason.trim() : cancelReasonChoice;
+                if (!reason) {
+                  setAlert({ kind: "error", message: "Ajoutez un motif avant d’annuler la commande." });
+                  return;
+                }
+                updateStatus(expanded, "cancelled", reason);
+              }}
+            >
+              <label htmlFor="order-cancel-reason">Motif d’annulation</label>
+              <div className="bo-order-cancel-reasons" role="group" aria-label="Motifs d’annulation">
+                {CANCELLATION_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className={`bo-order-cancel-reason ${cancelReasonChoice === reason ? "is-selected" : ""}`}
+                    aria-pressed={cancelReasonChoice === reason}
+                    onClick={() => { setCancelReasonChoice(reason); setCancelReason(""); }}
+                  >
+                    {reason}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={`bo-order-cancel-reason ${cancelReasonChoice === "Autre" ? "is-selected" : ""}`}
+                  aria-pressed={cancelReasonChoice === "Autre"}
+                  onClick={() => { setCancelReasonChoice("Autre"); setCancelReason(""); }}
+                >
+                  Autre
+                </button>
+              </div>
+              {cancelReasonChoice === "Autre" && (
+                <textarea
+                  id="order-cancel-reason"
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  placeholder="Décrivez brièvement le motif…"
+                  maxLength={200}
+                  autoFocus
+                  required
+                />
+              )}
+              <div className="bo-order-cancel-actions">
+                <Button type="submit" disabled={actionId === `${expanded.id}:cancelled`}>
+                  <X size={14} /> Confirmer l’annulation
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {correctionFormOpen && (
+            <form
+              className="bo-order-cancel-form bo-order-correction-form"
+              onSubmit={(event) => { event.preventDefault(); correctStatus(expanded); }}
+            >
+              <label htmlFor="order-correction-status">Nouveau statut</label>
+              <select
+                id="order-correction-status"
+                className="bo-native-select"
+                value={correctionStatus}
+                onChange={(event) => setCorrectionStatus(event.target.value)}
+                required
+              >
+                <option value="">Choisir le bon statut…</option>
+                {CORRECTION_STATUSES.filter(([value]) => value !== expanded.status).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <div className="bo-order-cancel-actions">
+                <Button type="submit" disabled={!correctionStatus || actionId === `${expanded.id}:correction`}>
+                  <RotateCcw size={14} /> Confirmer la correction
+                </Button>
+              </div>
+            </form>
+          )}
+
           <div className="bo-order-sheet-block">
             <p className="bo-order-sheet-label">Contact</p>
             <p><Phone size={11} strokeWidth={2} /> {expanded.phone}</p>
@@ -408,15 +554,20 @@ export default function OrdersPage() {
                 : "Retrait chez Galatée"}
             </p>
             {expanded.deliveryMode === "delivery" && (
-              <p style={{ marginTop: 4 }}>
+              <p style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 6, fontSize: 12 }}>
+                {Number.isFinite(expanded.deliveryLatitude) && Number.isFinite(expanded.deliveryLongitude) && (
+                  <span style={{ color: "var(--bo-ink-muted)" }}>
+                    📍 {expanded.deliveryLatitude.toFixed(5)}, {expanded.deliveryLongitude.toFixed(5)}
+                  </span>
+                )}
+                {/* Meme priorite que le livreur : lien du client, position, puis adresse. */}
                 <a
                   href={orderMapsHref(expanded)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--bo-accent, currentColor)" }}
+                  style={{ color: "var(--bo-brand)", fontWeight: 600, textDecoration: "underline" }}
                 >
-                  <span>{MAPS_LINK_LABELS[orderLocationSource(expanded)]}</span>
-                  <ArrowUpRight size={11} strokeWidth={2} />
+                  {MAPS_LINK_LABELS[orderLocationSource(expanded)]} ↗
                 </a>
               </p>
             )}

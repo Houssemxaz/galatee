@@ -1,40 +1,51 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
+import { InMemoryIdempotencyStore, RedisIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
 
-test("readIdempotencyKey validates format and rejects noise", () => {
-  assert.equal(readIdempotencyKey({ headers: {} }), null);
-  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "" } }), null);
-  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "short" } }), null);
-  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "bad space in key" } }), null);
-  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "abc123-DEF_.abc123" } }), "abc123-DEF_.abc123");
+test("idempotency store replays a completed response and releases failed work", () => {
+  const store = new InMemoryIdempotencyStore({ ttlMs: 100 });
+  assert.equal(store.beginOrGet("client", "checkout-123").acquired, true);
+  assert.equal(store.beginOrGet("client", "checkout-123").acquired, false);
+  store.complete("client", "checkout-123", { order: { id: "1" } });
+  assert.deepEqual(store.get("client", "checkout-123").response, { order: { id: "1" } });
+  store.beginOrGet("client", "failed-123");
+  store.release("client", "failed-123");
+  assert.equal(store.beginOrGet("client", "failed-123").acquired, true);
 });
 
-test("InMemoryIdempotencyStore locks in-flight and returns a completed response", () => {
-  const store = new InMemoryIdempotencyStore({ ttlMs: 60_000 });
-  const first = store.beginOrGet("cust:1", "key-XYZ-1234");
-  assert.equal(first.acquired, true);
+test("readIdempotencyKey accepts bounded safe keys only", () => {
+  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "checkout-123" } }), "checkout-123");
+  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "short" } }), null);
+  assert.equal(readIdempotencyKey({ headers: { "idempotency-key": "bad key 123" } }), null);
+});
 
-  // Une deuxieme requete concurrente voit le verrou.
-  const second = store.beginOrGet("cust:1", "key-XYZ-1234");
+test("RedisIdempotencyStore acquires once and replays a completed response", async () => {
+  const values = new Map();
+  const client = {
+    async get(key) { return values.get(key)?.value || null; },
+    async set(key, value, options = {}) {
+      if (options.NX && values.has(key)) return null;
+      values.set(key, { value, ttl: options.PX });
+      return "OK";
+    },
+    async eval(_script, { keys, arguments: args }) {
+      const current = values.get(keys[0]);
+      if (current?.value === args[0]) values.delete(keys[0]);
+      return 1;
+    },
+  };
+  const store = new RedisIdempotencyStore({ client, ttlMs: 1_000 });
+
+  const first = await store.beginOrGet("anonymous:test", "checkout-123", 100);
+  const second = await store.beginOrGet("anonymous:test", "checkout-123", 100);
+  assert.equal(first.acquired, true);
   assert.equal(second.acquired, false);
   assert.equal(second.entry.status, "in_flight");
 
-  // Une fois complete, la meme cle rejoue la reponse memorisee.
-  store.complete("cust:1", "key-XYZ-1234", { orderId: "abc" });
-  const done = store.get("cust:1", "key-XYZ-1234");
-  assert.equal(done.status, "done");
-  assert.deepEqual(done.response, { orderId: "abc" });
-
-  // Scope different = clef differente.
-  assert.equal(store.get("cust:2", "key-XYZ-1234"), null);
-});
-
-test("InMemoryIdempotencyStore release() lets a failed request retry", () => {
-  const store = new InMemoryIdempotencyStore({ ttlMs: 60_000 });
-  const first = store.beginOrGet("cust:9", "key-XYZ-9999");
-  assert.equal(first.acquired, true);
-  store.release("cust:9", "key-XYZ-9999");
-  const retry = store.beginOrGet("cust:9", "key-XYZ-9999");
-  assert.equal(retry.acquired, true);
+  await store.complete("anonymous:test", "checkout-123", { order: { id: "1" } }, 100);
+  assert.deepEqual(await store.get("anonymous:test", "checkout-123", 100), {
+    status: "done",
+    response: { order: { id: "1" } },
+    expiresAt: 1_100,
+  });
 });

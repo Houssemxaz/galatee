@@ -34,7 +34,7 @@ function formFromRevision(revision, item) {
     category: item?.category || "fresca",
     sortOrder: String(item?.sortOrder ?? 1),
     price: revision.price || "",
-    available: revision.available !== false,
+    available: item?.available ?? revision.available !== false,
   };
 }
 
@@ -92,7 +92,7 @@ export default function MenuItemDialog({ open, onOpenChange, item, onSaved, onDe
   }
 
   function buildPayload() {
-    return {
+    const payload = {
       itemType: form.itemType,
       title: form.title,
       shortDescription: form.shortDescription,
@@ -101,8 +101,12 @@ export default function MenuItemDialog({ open, onOpenChange, item, onSaved, onDe
       sortOrder: Number(form.sortOrder) || 1,
       price: form.price,
       imageAlt: form.title,
-      available: form.available,
     };
+    // Availability is managed independently from draft content. Keep it out
+    // of ordinary edits so changing a price or description cannot restore an
+    // item that staff intentionally put into rupture.
+    if (!itemId || form.available !== Boolean(item?.available)) payload.available = form.available;
+    return payload;
   }
 
   async function submit(event) {
@@ -174,7 +178,7 @@ export default function MenuItemDialog({ open, onOpenChange, item, onSaved, onDe
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bo-dialog bo-dialog-wide">
+      <DialogContent className="bo-dialog bo-dialog-wide bo-menu-item-dialog">
         <DialogHeader>
           <DialogTitle className="bo-dialog-title">{itemId ? "Modifier l'élément" : "Nouvel élément"}</DialogTitle>
           <DialogDescription className="bo-dialog-desc">

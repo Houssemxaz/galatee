@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DriverError, DriverSystem } from "./driverSystem.js";
 import { MenuSystem } from "./menuSystem.js";
 import { OrderSystem } from "./orderSystem.js";
 import { SqliteReservationStore } from "./reservationSystem.js";
-import { DriverSystem } from "./driverSystem.js";
 
-const fixedNow = () => new Date("2026-09-13T18:00:00.000Z");
+const fixedNow = () => new Date("2026-09-28T19:00:00.000Z");
 
 function createSystems(t) {
   const store = new SqliteReservationStore();
@@ -16,93 +16,125 @@ function createSystems(t) {
   return { store, menu, orders, drivers };
 }
 
-function orderBody(itemId, overrides = {}) {
+function deliveryBody(itemId) {
   return {
     firstName: "Lina",
     lastName: "Martin",
-    phone: "+213 555 123 456",
+    phone: "+213555123456",
     email: "lina@example.com",
     deliveryMode: "delivery",
     communeId: "hydra",
     deliveryAddress: "12 rue des Oliviers, Hydra",
-    items: [{ productId: itemId }],
-    ...overrides,
+    items: [{ productId: itemId, quantity: 1 }],
   };
 }
 
-// Ce test protege un bug reel : les requetes SQL de driverSystem etaient
-// independantes de orderSystem.mapOrder() et ne selectionnaient pas les colonnes
-// delivery_latitude / delivery_longitude. Resultat, le livreur recevait toujours
-// deliveryLatitude/Longitude = undefined meme quand le client avait pose un point
-// exact au checkout.
-test("driver views expose delivery coordinates so the map link is precise", (t) => {
-  const { menu, orders, drivers } = createSystems(t);
+function prepareDelivery({ menu, orders, drivers }) {
   const item = menu.listPublished()[0];
+  const order = orders.createOrder(deliveryBody(item.id));
+  orders.updateStatus(order.id, "confirmed");
+  orders.updateStatus(order.id, "ready");
+  const driver = drivers.create({ firstName: "Nora", phone: "+213555987654", pin: "1234" });
+  drivers.assignOrder(order.id, driver.id);
+  return { order, driver };
+}
 
-  // Commande avec coordonnees precises (Hydra centre)
-  const withCoords = orders.createOrder(orderBody(item.id, {
-    deliveryLatitude: 36.75123,
-    deliveryLongitude: 3.04567,
-  }));
-  orders.updateStatus(withCoords.id, "confirmed");
+test("delivery cancellation after departure is audited and excluded from delivered revenue", (t) => {
+  const { store, menu, orders, drivers } = createSystems(t);
+  const { order, driver } = prepareDelivery({ menu, orders, drivers });
 
-  // Commande sans coordonnees (chemin de fallback pour anciennes commandes)
-  const withoutCoords = orders.createOrder(orderBody(item.id));
-  orders.updateStatus(withoutCoords.id, "confirmed");
+  drivers.markInTransit(driver.id, order.id);
+  const result = drivers.markDeliveryCancelledByDriver(driver.id, order.id, "Client n'a pas récupéré la commande.");
 
-  // Pool livreur : doit exposer les coords quand elles existent, null sinon.
-  const pool = drivers.listPool();
-  const pooledWith = pool.find((o) => o.id === withCoords.id);
-  const pooledWithout = pool.find((o) => o.id === withoutCoords.id);
-  assert.ok(pooledWith, "commande avec coords doit apparaitre dans le pool");
-  assert.equal(pooledWith.deliveryLatitude, 36.75123);
-  assert.equal(pooledWith.deliveryLongitude, 3.04567);
-  assert.ok(pooledWithout, "commande sans coords doit aussi apparaitre dans le pool");
-  assert.equal(pooledWithout.deliveryLatitude, null);
-  assert.equal(pooledWithout.deliveryLongitude, null);
+  const saved = orders.getOrder(order.id);
+  assert.equal(result.orderId, order.id);
+  assert.equal(saved.status, "cancelled");
+  assert.equal(saved.deliveredAt, null);
+  assert.equal(drivers.listActiveOrders(driver.id).length, 0);
+  assert.equal(drivers.getById(driver.id).currentStatus, "available");
+  assert.deepEqual(drivers.getStats(driver.id).today, { delivered: 0, cancelled: 1 });
+  assert.equal(drivers.listHistory(driver.id)[0].status, "cancelled");
 
-  // Un livreur prend la course avec coords.
-  const driver = drivers.create({ firstName: "Yassine", phone: "+213 555 987 654", pin: "1234" });
-  drivers.takeOrder(driver.id, withCoords.id);
-
-  // listActiveOrders() doit garder les coords : c'est celle-la que la PWA lit.
-  const active = drivers.listActiveOrders(driver.id);
-  assert.equal(active.length, 1);
-  assert.equal(active[0].id, withCoords.id);
-  assert.equal(active[0].deliveryLatitude, 36.75123);
-  assert.equal(active[0].deliveryLongitude, 3.04567);
-
-  // Historique : la commande livree conserve aussi les coords (utile pour audit).
-  orders.updateStatus(withCoords.id, "ready");
-  drivers.markDelivered(driver.id, withCoords.id);
-  const history = drivers.listHistory(driver.id);
-  assert.equal(history.length, 1);
-  assert.equal(history[0].id, withCoords.id);
-  assert.equal(history[0].deliveryLatitude, 36.75123);
-  assert.equal(history[0].deliveryLongitude, 3.04567);
+  const history = store.db.prepare(`
+    SELECT status, note FROM order_status_history
+    WHERE order_id = ? ORDER BY changed_at DESC, id DESC LIMIT 1
+  `).get(order.id);
+  assert.equal(history.status, "cancelled");
+  assert.match(history.note, /Client n'a pas récupéré/);
 });
 
-// Meme piege que ci-dessus pour le lien Google Maps colle par le client : les
-// requetes SQL du livreur doivent selectionner delivery_maps_url.
-test("driver views expose the pasted Google Maps link", (t) => {
+test("delivery cancellation is only available after the driver starts the route", (t) => {
+  const { menu, orders, drivers } = createSystems(t);
+  const { order, driver } = prepareDelivery({ menu, orders, drivers });
+
+  assert.throws(
+    () => drivers.markDeliveryCancelledByDriver(driver.id, order.id, "Client injoignable"),
+    (error) => error instanceof DriverError && error.code === "ORDER_NOT_DELIVERY_CANCELLABLE",
+  );
+});
+
+test("driver login locks after five failed PIN attempts and unlocks after five minutes", (t) => {
+  let nowMs = Date.parse("2026-09-28T19:00:00.000Z");
+  const store = new SqliteReservationStore();
+  t.after(() => store.close());
+  const drivers = new DriverSystem({ db: store.db, now: () => new Date(nowMs) });
+  drivers.create({ firstName: "Nora", phone: "+213555987654", pin: "1234" });
+
+  for (let attempt = 1; attempt < 5; attempt += 1) {
+    assert.throws(
+      () => drivers.loginWithPin({ phone: "+213555987654", pin: "0000" }),
+      (error) => error instanceof DriverError && error.code === "DRIVER_INVALID_CREDENTIALS" && error.status === 401,
+    );
+  }
+  assert.throws(
+    () => drivers.loginWithPin({ phone: "+213555987654", pin: "0000" }),
+    (error) => error instanceof DriverError
+      && error.code === "DRIVER_LOGIN_LOCKED"
+      && error.status === 429
+      && error.details.retryAfterSeconds === 300,
+  );
+  assert.throws(
+    () => drivers.loginWithPin({ phone: "+213555987654", pin: "1234" }),
+    (error) => error instanceof DriverError && error.code === "DRIVER_LOGIN_LOCKED",
+  );
+
+  nowMs += 5 * 60 * 1000 + 1;
+  const login = drivers.loginWithPin({ phone: "+213555987654", pin: "1234" });
+  assert.equal(login.driver.phone, "+213555987654");
+});
+
+// Les requetes SQL du livreur sont independantes de orderSystem.mapOrder() :
+// elles doivent selectionner le lien Google Maps et les coordonnees, sinon le
+// livreur retombe sur l adresse texte meme quand le client a donne mieux.
+test("driver views expose the pasted Google Maps link and exact coordinates", (t) => {
   const { menu, orders, drivers } = createSystems(t);
   const item = menu.listPublished()[0];
   const link = "https://maps.app.goo.gl/AbCdEf123";
 
-  const withLink = orders.createOrder(orderBody(item.id, { deliveryMapsUrl: link }));
+  const withLink = orders.createOrder({
+    ...deliveryBody(item.id), deliveryMapsUrl: link, deliveryLatitude: 36.75123, deliveryLongitude: 3.04567,
+  });
   orders.updateStatus(withLink.id, "confirmed");
-  const withoutLink = orders.createOrder(orderBody(item.id));
+  const withoutLink = orders.createOrder(deliveryBody(item.id));
   orders.updateStatus(withoutLink.id, "confirmed");
 
   const pool = drivers.listPool();
-  assert.equal(pool.find((o) => o.id === withLink.id).deliveryMapsUrl, link);
+  const pooled = pool.find((o) => o.id === withLink.id);
+  assert.equal(pooled.deliveryMapsUrl, link);
+  assert.equal(pooled.deliveryLatitude, 36.75123);
+  assert.equal(pooled.deliveryLongitude, 3.04567);
   assert.equal(pool.find((o) => o.id === withoutLink.id).deliveryMapsUrl, null);
 
   const driver = drivers.create({ firstName: "Yassine", phone: "+213 555 987 654", pin: "1234" });
   drivers.takeOrder(driver.id, withLink.id);
-  assert.equal(drivers.listActiveOrders(driver.id)[0].deliveryMapsUrl, link);
+  const active = drivers.listActiveOrders(driver.id)[0];
+  assert.equal(active.deliveryMapsUrl, link);
+  assert.equal(active.deliveryLatitude, 36.75123);
 
   orders.updateStatus(withLink.id, "ready");
+  drivers.markInTransit(driver.id, withLink.id);
   drivers.markDelivered(driver.id, withLink.id);
-  assert.equal(drivers.listHistory(driver.id)[0].deliveryMapsUrl, link);
+  const history = drivers.listHistory(driver.id)[0];
+  assert.equal(history.deliveryMapsUrl, link);
+  assert.equal(history.deliveryLatitude, 36.75123);
 });

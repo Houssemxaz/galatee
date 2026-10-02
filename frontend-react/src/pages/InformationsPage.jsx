@@ -54,6 +54,14 @@ export default function InformationsPage() {
       {/* ═══ 02 — RÉGIMES — sandy warm (soft) ═══ */}
       <section className="pbg-section pbg-section-warm pbg-info-diet">
         <div className="pbg-page-shell">
+          <img
+            className="pbg-info-diet-art"
+            src="/assets/brand/ingredient-garlic-chili-oil.png"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+          />
           <Reveal className="pbg-section-head">
             <div className="pbg-section-index"><span>02</span><i />La carte</div>
             <div className="pbg-section-heading">

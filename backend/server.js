@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
+import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize, sep } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AnalyticsError, AnalyticsSystem } from "./analyticsSystem.js";
 import {
@@ -11,61 +13,106 @@ import {
 import { MenuError, MenuSystem } from "./menuSystem.js";
 import { OrderError, OrderSystem } from "./orderSystem.js";
 import { LoyaltyError, LoyaltySystem } from "./loyaltySystem.js";
+import { PromotionError, PromotionSystem } from "./promotionsSystem.js";
 import { ClubError, ClubSystem } from "./clubSystem.js";
 import { DriverError, DriverSystem, buildDriverSessionCookie } from "./driverSystem.js";
-import {
-  ReservationError,
-  ReservationSystem,
-  SqliteReservationStore,
-} from "./reservationSystem.js";
+import { PostgresSyncDatabase } from "./postgres/syncDatabase.js";
+import { createClient } from "redis";
 import {
   applyCorsHeaders as applyCorsHeadersImpl,
   applySecurityHeaders,
   ensureRequestId,
   IS_PRODUCTION,
   isSecureRequest,
+  isAllowedMutationOrigin,
   logger,
+  NODE_ENV,
   resolveClientIp,
   resolveCorsOrigin,
   safeTokenCompare,
 } from "./security.js";
-import { applyRateLimit, limiterFromEnv } from "./rateLimit.js";
-import { InMemoryIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
+import { applyRateLimit, createRedisRateLimiters, limiterFromEnv, RATE_LIMIT_DEFAULTS } from "./rateLimit.js";
+import { InMemoryIdempotencyStore, RedisIdempotencyStore, readIdempotencyKey } from "./idempotency.js";
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const frontendDir = join(rootDir, "frontend");
 const reactDistDir = join(rootDir, "frontend-react", "dist");
-// GALATEE_DB_PATH permet de pointer sur une base isolee : tests E2E, staging,
-// migration one-shot. Non defini = base de developpement locale par defaut.
 const databasePath = process.env.GALATEE_DB_PATH || join(rootDir, "backend", "data", "galatee.sqlite");
-const legacyJsonPath = join(rootDir, "backend", "data", "reservations.json");
 const menuUploadDir = process.env.GALATEE_UPLOAD_DIR || join(rootDir, "backend", "data", "uploads", "menu");
 const port = Number(process.env.PORT || 3000);
 const adminToken = process.env.GALATEE_ADMIN_TOKEN || "";
 const allowedOrigin = process.env.GALATEE_ALLOWED_ORIGIN || "*";
+const usePostgres = (process.env.GALATEE_DATABASE || "sqlite").toLowerCase() === "postgres";
+if (process.env.NODE_ENV === "production" && !usePostgres) {
+  throw new Error("Production runtime requires GALATEE_DATABASE=postgres; SQLite is local-only.");
+}
+const runtimeDatabase = usePostgres
+  ? new PostgresSyncDatabase({ connectionString: process.env.DATABASE_URL })
+  : openSqliteDatabase(databasePath);
 
-// Limites configurables par variables d env RL_<NAME>_WINDOW_MS / RL_<NAME>_MAX.
-// Les defauts protegent contre le bruteforce (auth, driver login), les floods
-// (analytics, uploads) et les abus (admin, orders).
 const defaultRateLimiters = {
-  auth: limiterFromEnv("AUTH", { windowMs: 15 * 60 * 1000, max: 20 }),
-  order: limiterFromEnv("ORDER", { windowMs: 60 * 1000, max: 8 }),
-  analytics: limiterFromEnv("ANALYTICS", { windowMs: 60 * 1000, max: 60 }),
-  upload: limiterFromEnv("UPLOAD", { windowMs: 60 * 1000, max: 10 }),
-  admin: limiterFromEnv("ADMIN", { windowMs: 60 * 1000, max: 120 }),
+  auth: limiterFromEnv("AUTH", RATE_LIMIT_DEFAULTS.auth),
+  order: limiterFromEnv("ORDER", RATE_LIMIT_DEFAULTS.order),
+  analytics: limiterFromEnv("ANALYTICS", RATE_LIMIT_DEFAULTS.analytics),
+  upload: limiterFromEnv("UPLOAD", RATE_LIMIT_DEFAULTS.upload),
+  admin: limiterFromEnv("ADMIN", RATE_LIMIT_DEFAULTS.admin),
 };
 const defaultIdempotencyStore = new InMemoryIdempotencyStore();
 
-const reservationSystem = new ReservationSystem({
-  store: new SqliteReservationStore({ databasePath, legacyJsonPath }),
-});
-const menuSystem = new MenuSystem({ db: reservationSystem.store.db, uploadRoot: menuUploadDir });
-const loyaltySystem = new LoyaltySystem({ db: reservationSystem.store.db });
-const orderSystem = new OrderSystem({ db: reservationSystem.store.db, menu: menuSystem, loyalty: loyaltySystem });
-const analyticsSystem = new AnalyticsSystem({ db: reservationSystem.store.db });
-const customerAuthSystem = new CustomerAuthSystem({ db: reservationSystem.store.db });
-const clubSystem = new ClubSystem({ db: reservationSystem.store.db });
-const driverSystem = new DriverSystem({ db: reservationSystem.store.db });
+// Les chemins sensibles sont regroupés ici pour que l'audit du rate limiting
+// reste lisible sans parcourir tout le routeur HTTP.
+const CUSTOMER_AUTH_RATE_LIMIT_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/auth/request-code",
+  "/api/auth/request-password-reset",
+  "/api/auth/confirm-password-reset",
+  "/api/auth/verify-code",
+]);
+const ADMIN_RATE_LIMIT_PATH = /^\/api\/admin\//;
+const MENU_IMAGE_RATE_LIMIT_PATH = /^\/api\/admin\/menu\/[^/]+\/image$/;
+
+export function createSharedStoreRuntime({
+  redisUrl = process.env.REDIS_URL || "",
+  keyPrefix = process.env.REDIS_KEY_PREFIX || "galatee:",
+} = {}) {
+  if (!redisUrl) {
+    // Une seule instance backend peut utiliser la mémoire. Redis devient
+    // nécessaire dès que plusieurs instances doivent partager ces compteurs.
+    return {
+      mode: "memory",
+      rateLimiters: defaultRateLimiters,
+      idempotencyStore: defaultIdempotencyStore,
+      connect: async () => {},
+      close: async () => {},
+      health: async () => true,
+    };
+  }
+
+  const client = createClient({ url: redisUrl });
+  client.on("error", (error) => logger.error("shared_store.redis_error", { error: error.message }));
+  return {
+    mode: "redis",
+    rateLimiters: createRedisRateLimiters(client, { keyPrefix: `${keyPrefix}rate:` }),
+    idempotencyStore: new RedisIdempotencyStore({ client, keyPrefix: `${keyPrefix}idempotency:` }),
+    connect: async () => {
+      if (!client.isOpen) await client.connect();
+    },
+    close: async () => {
+      if (client.isOpen) await client.quit();
+    },
+    health: async () => client.isReady,
+  };
+}
+
+const menuSystem = new MenuSystem({ db: runtimeDatabase, uploadRoot: menuUploadDir });
+const loyaltySystem = new LoyaltySystem({ db: runtimeDatabase });
+const promotionSystem = new PromotionSystem({ db: runtimeDatabase });
+const orderSystem = new OrderSystem({ db: runtimeDatabase, menu: menuSystem, loyalty: loyaltySystem, promotions: promotionSystem });
+const analyticsSystem = new AnalyticsSystem({ db: runtimeDatabase });
+const customerAuthSystem = new CustomerAuthSystem({ db: runtimeDatabase });
+const clubSystem = new ClubSystem({ db: runtimeDatabase });
+const driverSystem = new DriverSystem({ db: runtimeDatabase });
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -81,10 +128,11 @@ const mimeTypes = new Map([
 ]);
 
 export function createApp({
-  system = reservationSystem,
+  database = runtimeDatabase,
   menu = menuSystem,
   orders = orderSystem,
   loyalty = loyaltySystem,
+  promotions = promotionSystem,
   analytics = analyticsSystem,
   customerAuth = customerAuthSystem,
   club = clubSystem,
@@ -93,6 +141,7 @@ export function createApp({
   corsAllowedOrigin = allowedOrigin,
   rateLimiters = defaultRateLimiters,
   idempotencyStore = defaultIdempotencyStore,
+  sharedStoreHealth = async () => true,
 } = {}) {
   return createServer(async (request, response) => {
     const requestId = ensureRequestId(request);
@@ -108,23 +157,42 @@ export function createApp({
         return;
       }
 
-      // Health checks — jamais rate-limited, jamais authentifies, jamais
-      // journalisation verbeuse (evite le bruit des probes systemd/docker).
+      if (
+        url.pathname.startsWith("/api/driver/")
+        && !["GET", "HEAD"].includes(request.method)
+        && !isAllowedMutationOrigin(request, corsAllowedOrigin)
+      ) {
+        return sendJson(response, 403, {
+          error: {
+            code: "DRIVER_ORIGIN_FORBIDDEN",
+            message: "Origine de requête non autorisée.",
+          },
+        });
+      }
+
       if (url.pathname === "/health/live" && request.method === "GET") {
         return sendJson(response, 200, { status: "ok" });
       }
+
       if (url.pathname === "/health/ready" && request.method === "GET") {
         try {
-          system.store.db.prepare("SELECT 1 AS ok").get();
-          return sendJson(response, 200, { status: "ok", database: "ok" });
-        } catch (dbError) {
-          logger.error("health.ready.db_failure", { requestId, err: String(dbError?.message || dbError) });
+          // Le readiness check vérifie la base et le store partagé avant de
+          // laisser le reverse proxy envoyer du trafic vers cette instance.
+          database.prepare("SELECT 1 AS ok").get();
+          if (!(await sharedStoreHealth())) throw new Error("Shared store is not ready.");
+          return sendJson(response, 200, {
+            status: "ok",
+            database: "ok",
+            databaseMode: database?.isPostgres ? "postgres" : "sqlite",
+            sharedStore: "ok",
+          });
+        } catch (error) {
+          logger.error("health.ready.db_failure", { requestId, error: error.message });
           return sendJson(response, 503, { status: "unavailable", database: "unavailable" });
         }
       }
 
-      // Rate limiting sur les surfaces sensibles (avant lecture du body).
-      if (!enforceRateLimit(rateLimiters, url, request, response)) return;
+      if (!(await enforceRateLimit(rateLimiters, url, request, response))) return;
 
       if (url.pathname === "/api/auth/request-code" && request.method === "POST") {
         const payload = await customerAuth.requestCode(await readJsonBody(request));
@@ -183,12 +251,6 @@ export function createApp({
       if (url.pathname === "/api/orders" && request.method === "POST") {
         const body = await readJsonBody(request);
         const session = customerAuth.getSession(request);
-        // Identite du client : quand la session est authentifiee, on IGNORE
-        // firstName/lastName/phone/email du body et on force ceux du compte.
-        // Empeche un client authentifie de passer une commande sous une fausse
-        // identite (ou d ecraser son propre profil via le champ order).
-        // Les infos de livraison (adresse, commune, coords, note) restent
-        // propres a chaque commande et viennent bien du body.
         const orderBody = session
           ? {
             ...body,
@@ -198,36 +260,46 @@ export function createApp({
             email: session.account.email,
           }
           : body;
-
-        // Idempotency-Key : deux appels avec la meme cle et la meme identite
-        // renvoient la meme reponse sans recreer de commande. Scope :
-        // customerId (si authentifie) sinon IP+phone pour distinguer les
-        // clients anonymes qui partagent une IP publique.
         const idempotencyKey = readIdempotencyKey(request);
-        const idemScope = session?.account.id
-          ? `cust:${session.account.id}`
-          : `anon:${resolveClientIp(request)}:${String(orderBody?.phone || "").slice(0, 30)}`;
+        const scope = session?.account.id
+          ? `customer:${session.account.id}`
+          : `anonymous:${resolveClientIp(request)}:${String(orderBody.phone || "").slice(0, 30)}`;
+
         if (idempotencyKey) {
-          const existing = idempotencyStore.get(idemScope, idempotencyKey);
-          if (existing && existing.status === "done") {
+          const existing = await idempotencyStore.get(scope, idempotencyKey);
+          if (existing?.status === "done") {
             return sendJson(response, 201, existing.response, { "Idempotent-Replay": "true" });
           }
-          if (existing && existing.status === "in_flight") {
+          if (existing?.status === "in_flight") {
             return sendJson(response, 409, {
-              error: { code: "IDEMPOTENCY_IN_FLIGHT", message: "Une commande avec cette clé est déjà en cours de traitement." },
+              error: {
+                code: "IDEMPOTENCY_IN_FLIGHT",
+                message: "Une commande avec cette clé est déjà en cours de traitement.",
+              },
             });
           }
-          idempotencyStore.beginOrGet(idemScope, idempotencyKey);
+          const reservation = await idempotencyStore.beginOrGet(scope, idempotencyKey);
+          if (!reservation.acquired) {
+            if (reservation.entry?.status === "done") {
+              return sendJson(response, 201, reservation.entry.response, { "Idempotent-Replay": "true" });
+            }
+            return sendJson(response, 409, {
+              error: {
+                code: "IDEMPOTENCY_IN_FLIGHT",
+                message: "Une commande avec cette clé est déjà en cours de traitement.",
+              },
+            });
+          }
         }
 
         try {
           const payload = {
             order: orders.createOrder(orderBody, { customerId: session?.account.id || null }),
           };
-          if (idempotencyKey) idempotencyStore.complete(idemScope, idempotencyKey, payload);
+          if (idempotencyKey) await idempotencyStore.complete(scope, idempotencyKey, payload);
           return sendJson(response, 201, payload);
         } catch (error) {
-          if (idempotencyKey) idempotencyStore.release(idemScope, idempotencyKey);
+          if (idempotencyKey) await idempotencyStore.release(scope, idempotencyKey);
           throw error;
         }
       }
@@ -241,8 +313,15 @@ export function createApp({
       }
 
       if (url.pathname === "/api/menu" && request.method === "GET") {
-        const payload = { menu: menu.listPublished({ category: url.searchParams.get("category") }) };
+        const payload = {
+          menu: menu.listPublished({ category: url.searchParams.get("category") }),
+          promotions: promotions.list({ activeOnly: true }),
+        };
         return sendJson(response, 200, payload);
+      }
+
+      if (url.pathname === "/api/promotions" && request.method === "GET") {
+        return sendJson(response, 200, { promotions: promotions.list({ activeOnly: true }) });
       }
 
       if (url.pathname === "/api/pasta-lover-club" && request.method === "GET") {
@@ -296,8 +375,12 @@ export function createApp({
         assertAdminAuthorized(request, requiredAdminToken);
         const body = await readJsonBody(request);
         const orderId = decodeURIComponent(orderStatusMatch[1]);
-        const order = orders.updateStatus(orderId, body.status, body.note);
-        if (["delivered", "withdrawn", "completed"].includes(order.status) && order.customerId) {
+        const previous = orders.getOrder(orderId);
+        const order = body.correction
+          ? orders.correctStatus(orderId, body.status, body.note)
+          : orders.updateStatus(orderId, body.status, body.note);
+        const loyaltyStatuses = new Set(["delivered", "withdrawn", "completed"]);
+        if ((loyaltyStatuses.has(order.status) || loyaltyStatuses.has(previous?.status)) && order.customerId) {
           loyalty.syncCustomerRewards(order.customerId);
         }
         return sendJson(response, 200, {
@@ -316,6 +399,29 @@ export function createApp({
       if (url.pathname === "/api/admin/loyalty" && (request.method === "PUT" || request.method === "PATCH")) {
         assertAdminAuthorized(request, requiredAdminToken);
         return sendJson(response, 200, { settings: loyalty.updateSettings(await readJsonBody(request)) });
+      }
+
+      if (url.pathname === "/api/admin/promotions" && request.method === "GET") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { promotions: promotions.list() });
+      }
+
+      if (url.pathname === "/api/admin/promotions" && request.method === "POST") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 201, { promotion: promotions.create(await readJsonBody(request)) });
+      }
+
+      const promotionMatch = url.pathname.match(/^\/api\/admin\/promotions\/([^/]+)$/);
+      if (promotionMatch && request.method === "PATCH") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, {
+          promotion: promotions.update(decodeURIComponent(promotionMatch[1]), await readJsonBody(request)),
+        });
+      }
+
+      if (promotionMatch && request.method === "DELETE") {
+        assertAdminAuthorized(request, requiredAdminToken);
+        return sendJson(response, 200, { promotion: promotions.deactivate(decodeURIComponent(promotionMatch[1])) });
       }
 
       const menuItemMatch = url.pathname.match(/^\/api\/admin\/menu\/([^/]+)$/);
@@ -539,7 +645,19 @@ export function createApp({
         const session = drivers.getSession(request);
         if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
         const body = await readJsonBody(request);
+        if (body.deliveryAttempt === true) {
+          return sendJson(response, 200, drivers.markDeliveryCancelledByDriver(session.driver.id, decodeURIComponent(driverCancelMatch[1]), body.reason));
+        }
         return sendJson(response, 200, drivers.markCancelledByDriver(session.driver.id, decodeURIComponent(driverCancelMatch[1]), body.reason));
+      }
+
+      // Annuler une livraison après le départ (client absent, refus ou problème à l'arrivée).
+      const driverDeliveryCancelMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/cancel-delivery$/);
+      if (driverDeliveryCancelMatch && request.method === "POST") {
+        const session = drivers.getSession(request);
+        if (!session) return sendJson(response, 401, { error: { code: "DRIVER_UNAUTHENTICATED", message: "Non connecté." } });
+        const body = await readJsonBody(request);
+        return sendJson(response, 200, drivers.markDeliveryCancelledByDriver(session.driver.id, decodeURIComponent(driverDeliveryCancelMatch[1]), body.reason));
       }
 
       const driverOrderStartMatch = url.pathname.match(/^\/api\/driver\/orders\/([^/]+)\/start$/);
@@ -579,7 +697,7 @@ export function createApp({
 
       return serveStatic(url.pathname, request.method, response);
     } catch (error) {
-      if (error instanceof ReservationError || error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
+      if (error instanceof MenuError || error instanceof OrderError || error instanceof LoyaltyError || error instanceof PromotionError || error instanceof AnalyticsError || error instanceof CustomerAuthError || error instanceof ClubError || error instanceof DriverError) {
         return sendJson(response, error.status, {
           error: {
             code: error.code,
@@ -607,16 +725,25 @@ export function createApp({
         });
       }
 
+      if (error.code === "REQUEST_BODY_TOO_LARGE") {
+        return sendJson(response, 413, {
+          error: {
+            code: "REQUEST_BODY_TOO_LARGE",
+            message: "Request body is too large.",
+          },
+        });
+      }
+
       logger.error("server.internal_error", {
         requestId,
         method: request.method,
         path: url?.pathname,
-        err: String(error?.message || error),
+        error: error.message,
       });
       return sendJson(response, 500, {
         error: {
           code: "INTERNAL_ERROR",
-          message: "Unexpected reservation service error.",
+          message: "Unexpected server error.",
         },
       });
     }
@@ -624,10 +751,10 @@ export function createApp({
 }
 
 function assertAdminAuthorized(request, requiredAdminToken) {
-  // Sans GALATEE_ADMIN_TOKEN configure : mode developpement local, routes admin
-  // ouvertes. Le check "prod exige un token" est fait au demarrage (voir bloc
-  // `if (process.argv[1] === ...)` en bas de fichier) pour eviter un crash a
-  // chaque requete si l env est manquante.
+  // Intentionally optional: with no token configured, admin routes are open.
+  // This is a deliberate convenience for local development (see the "Token
+  // admin optionnel" field in the back-office AuthGate screen) - set
+  // GALATEE_ADMIN_TOKEN before exposing this server publicly.
   if (!requiredAdminToken) return;
 
   const header = String(request.headers.authorization || "");
@@ -645,38 +772,21 @@ function requireCustomerSession(customerAuth, request) {
   throw new CustomerAuthError("AUTH_UNAUTHORIZED", "A customer account is required.", 401);
 }
 
-// Applique le rate limiter approprie a la surface demandee. Retourne false si
-// un 429 a deja ete envoye (l'appelant doit alors s'arreter immediatement).
-function enforceRateLimit(limiters, url, request, response) {
-  const method = request.method;
-  const pathname = url.pathname;
+async function enforceRateLimit(limiters, url, request, response) {
+  const { method } = request;
+  const { pathname } = url;
   if (method === "POST") {
-    if (
-      pathname === "/api/auth/login"
-      || pathname === "/api/auth/signup"
-      || pathname === "/api/auth/request-code"
-      || pathname === "/api/auth/request-password-reset"
-      || pathname === "/api/auth/confirm-password-reset"
-      || pathname === "/api/auth/verify-code"
-    ) {
+    if (CUSTOMER_AUTH_RATE_LIMIT_PATHS.has(pathname)) {
       return applyRateLimit(limiters.auth, request, response, "customer-auth");
     }
-    if (pathname === "/api/driver/login") {
-      return applyRateLimit(limiters.auth, request, response, "driver-login");
-    }
-    if (pathname === "/api/orders") {
-      return applyRateLimit(limiters.order, request, response, "order");
-    }
-    if (pathname === "/api/analytics/events") {
-      return applyRateLimit(limiters.analytics, request, response, "analytics");
-    }
-    if (/^\/api\/admin\/menu\/[^/]+\/image$/.test(pathname)) {
+    if (pathname === "/api/driver/login") return applyRateLimit(limiters.auth, request, response, "driver-login");
+    if (pathname === "/api/orders") return applyRateLimit(limiters.order, request, response, "order");
+    if (pathname === "/api/analytics/events") return applyRateLimit(limiters.analytics, request, response, "analytics");
+    if (MENU_IMAGE_RATE_LIMIT_PATH.test(pathname)) {
       return applyRateLimit(limiters.upload, request, response, "menu-image");
     }
   }
-  if (pathname.startsWith("/api/admin/")) {
-    return applyRateLimit(limiters.admin, request, response, "admin");
-  }
+  if (ADMIN_RATE_LIMIT_PATH.test(pathname)) return applyRateLimit(limiters.admin, request, response, "admin");
   return true;
 }
 
@@ -753,7 +863,9 @@ async function readJsonBody(request) {
   for await (const chunk of request) {
     raw += chunk;
     if (raw.length > 32_000) {
-      throw new ReservationError("REQUEST_BODY_TOO_LARGE", "Request body is too large.", 413);
+      const error = new Error("Request body is too large.");
+      error.code = "REQUEST_BODY_TOO_LARGE";
+      throw error;
     }
   }
 
@@ -844,13 +956,14 @@ function sendText(response, status, message) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  // ── Verrous de demarrage en production ────────────────────────────────
-  // On refuse le boot plutot que de logger un warning : mieux vaut un service
-  // qui ne demarre pas qu un backend prod ouvert.
   if (IS_PRODUCTION) {
     const missing = [];
     if (!adminToken) missing.push("GALATEE_ADMIN_TOKEN");
-    try { resolveCorsOrigin(allowedOrigin); } catch (err) { missing.push("GALATEE_ALLOWED_ORIGIN"); }
+    try {
+      resolveCorsOrigin(allowedOrigin);
+    } catch {
+      missing.push("GALATEE_ALLOWED_ORIGIN");
+    }
     if (missing.length) {
       console.error(`Refusing to start in production: missing env vars: ${missing.join(", ")}.`);
       process.exit(1);
@@ -863,32 +976,57 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     );
   }
 
-  const server = createApp();
-  server.listen(port, () => {
-    logger.info("server.listen", { port, env: process.env.NODE_ENV || "development" });
-    console.log(`Galatee reservation server listening on http://localhost:${port}`);
-  });
+  const sharedStores = createSharedStoreRuntime();
+  let server = null;
+  async function start() {
+    try {
+      await sharedStores.connect();
+      server = createApp({
+        rateLimiters: sharedStores.rateLimiters,
+        idempotencyStore: sharedStores.idempotencyStore,
+        sharedStoreHealth: sharedStores.health,
+      });
+      server.listen(port, () => {
+        logger.info("server.listen", { port, env: NODE_ENV, sharedStore: sharedStores.mode });
+        console.log(`Galatee database mode: ${usePostgres ? "PostgreSQL" : "SQLite"}`);
+        console.log(`Galatee shared store mode: ${sharedStores.mode}`);
+        console.log(`Galatee order server listening on http://localhost:${port}`);
+      });
+    } catch (error) {
+      logger.error("server.start.shared_store_failure", { error: error.message, mode: sharedStores.mode });
+      try { runtimeDatabase.close?.(); } catch { /* ignore cleanup failures */ }
+      process.exit(1);
+    }
+  }
+  void start();
 
-  // ── Arret propre : SIGTERM/SIGINT ferment les connexions HTTP puis la DB.
-  // Docker / systemd envoient SIGTERM ; Ctrl+C envoie SIGINT.
   let shuttingDown = false;
   function shutdown(signal) {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info("server.shutdown.start", { signal });
-    // 10 s max : au-dela, on force la sortie pour ne pas bloquer un deploy.
-    const forceTimer = setTimeout(() => {
-      logger.error("server.shutdown.force_exit", { signal });
-      process.exit(1);
-    }, 10_000);
+    const forceTimer = setTimeout(() => process.exit(1), 10_000);
     forceTimer.unref?.();
-    server.close(() => {
-      try { reservationSystem.store.close?.(); } catch { /* ignore */ }
-      logger.info("server.shutdown.done", { signal });
+    const finish = async () => {
+      try { await sharedStores.close(); } catch (error) { logger.warn("server.shutdown.shared_store_error", { error: error.message }); }
+      try { runtimeDatabase.close?.(); } catch (error) { logger.warn("server.shutdown.database_error", { error: error.message }); }
       clearTimeout(forceTimer);
+      logger.info("server.shutdown.done", { signal });
       process.exit(0);
-    });
+    };
+    if (!server) {
+      void finish();
+      return;
+    }
+    server.close(() => void finish());
   }
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+function openSqliteDatabase(pathname) {
+  mkdirSync(dirname(pathname), { recursive: true });
+  const db = new DatabaseSync(pathname);
+  db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
+  return db;
 }

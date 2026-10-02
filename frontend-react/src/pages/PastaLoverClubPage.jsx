@@ -33,6 +33,14 @@ export default function PastaLoverClubPage() {
       {/* ═══ 01 — INTRO — split éditorial ═══ */}
       <section className="club-section club-section-intro">
         <div className="pbg-page-shell club-intro-shell">
+          <img
+            className="club-signature-art club-signature-art-headphones"
+            src="/assets/brand/club-vinyl-headphones.png"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+          />
           <Reveal className="club-intro-copy">
             <p className="club-intro-kicker"><UsersRound size={13} strokeWidth={2} /> La communauté Galatée</p>
             <h1 className="club-intro-title">
@@ -44,6 +52,11 @@ export default function PastaLoverClubPage() {
               <span>Découvrir les avantages</span>
               <ArrowUpRight size={14} strokeWidth={2} />
             </a>
+            <ul className="club-intro-highlights" aria-label="Avantages du Pasta Lover Club">
+              <li><span>01</span> Invitations privées</li>
+              <li><span>02</span> Ateliers pâtes fraîches</li>
+              <li><span>03</span> Avant-premières menu</li>
+            </ul>
           </Reveal>
 
           <Reveal className="club-membership-card" delay={140}>

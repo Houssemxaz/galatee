@@ -292,14 +292,22 @@ export class MenuSystem {
       throw new MenuError("MENU_ITEM_ARCHIVED", "Archived menu items cannot be edited.", 409);
     }
     const base = current.draft || current.published;
-    const item = normalizeMenuInput({
+    const mergedInput = {
       ...base,
       category: current.category,
       sortOrder: current.sortOrder,
       ...input,
-    }, { requireTitle: true });
+    };
+    // Existing revisions expose `priceCents`, while the admin form edits the
+    // friendlier `price` value. Remove the legacy alias when a new price is
+    // supplied so the old cents value cannot silently win via `??`.
+    if (Object.hasOwn(input || {}, "price") && !Object.hasOwn(input || {}, "priceCents")) {
+      delete mergedInput.priceCents;
+    }
+    const item = normalizeMenuInput(mergedInput, { requireTitle: true });
     const revisionId = randomUUID();
     const timestamp = this.now().toISOString();
+    const availabilityWasEdited = Object.hasOwn(input || {}, "available") || Object.hasOwn(input || {}, "isAvailable");
     this.runInTransaction(() => {
       this.insertRevision({ revisionId, itemId: id, item, createdAt: timestamp });
       this.db.prepare(`
@@ -307,6 +315,10 @@ export class MenuSystem {
         SET item_type = ?, category = ?, sort_order = ?, draft_revision_id = ?, status = 'draft', updated_at = ?, archived_at = NULL
         WHERE id = ?
       `).run(item.itemType, item.category, item.sortOrder, revisionId, timestamp, id);
+      if (availabilityWasEdited) {
+        this.db.prepare("UPDATE menu_items SET available = ?, updated_at = ? WHERE id = ?")
+          .run(item.available ? 1 : 0, timestamp, id);
+      }
     });
     return this.getAdmin(id);
   }

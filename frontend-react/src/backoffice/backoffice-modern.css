@@ -1296,6 +1296,279 @@ html[data-bo-theme="dark"] [data-slot="select-content"] {
   color: var(--bo-ink) !important;
   border-color: var(--bo-hairline) !important;
 }
+
+/* ========================================================================
+ * FINAL GALATEE THEME
+ * Shared visual language with the driver PWA. Layouts stay untouched.
+ * ======================================================================== */
+
+:root {
+  --bo-font: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bo-display: "Antonio", "DM Sans", sans-serif;
+  --bo-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --bo-bg: #F5EFE4;
+  --bo-paper: #FFFCF5;
+  --bo-panel: #EEE8DB;
+  --bo-cream: #FFFCF5;
+  --bo-cream-2: #F5EFE4;
+  --bo-cream-3: #EEE8DB;
+  --bo-ink: #1A2015;
+  --bo-ink-soft: #5B6154;
+  --bo-ink-muted: #7D806F;
+  --bo-hairline: rgba(47, 56, 33, .15);
+  --bo-hairline-strong: rgba(47, 56, 33, .28);
+
+  --bo-sb: #FFFCF5;
+  --bo-sb-2: #F5EFE4;
+  --bo-sb-hover: #F0E9DB;
+  --bo-sb-active: rgba(208, 54, 43, .10);
+  --bo-sb-text: #5B6154;
+  --bo-sb-text-strong: #1A2015;
+  --bo-sb-text-muted: #858B7C;
+  --bo-sb-hairline: rgba(47, 56, 33, .14);
+
+  --bo-brand: #D0362B;
+  --bo-brand-2: #B8322B;
+  --bo-brand-soft: rgba(208, 54, 43, .10);
+  --bo-brand-mid: rgba(208, 54, 43, .24);
+  --bo-emerald-500: #3A6E42;
+  --bo-emerald-600: #2A5230;
+  --bo-emerald-400: #6BB574;
+  --bo-emerald-soft: rgba(58, 110, 66, .12);
+  --bo-emerald-ring: rgba(58, 110, 66, .22);
+  --bo-amber: #C7862B;
+  --bo-amber-2: #A96B20;
+  --bo-amber-soft: rgba(199, 134, 43, .14);
+  --bo-amber-tint: #FBF0D7;
+  --bo-ok: #3A6E42;
+  --bo-ok-soft: rgba(58, 110, 66, .12);
+  --bo-warn: #C7862B;
+  --bo-warn-soft: rgba(199, 134, 43, .14);
+  --bo-err: #D0362B;
+  --bo-err-soft: rgba(208, 54, 43, .10);
+  --bo-info: #527F9D;
+  --bo-info-soft: rgba(82, 127, 157, .12);
+  --bo-shadow-sm: 0 1px 2px rgba(47, 56, 33, .06), 0 4px 14px rgba(47, 56, 33, .05);
+  --bo-shadow: 0 8px 24px -12px rgba(47, 56, 33, .22);
+  --bo-shadow-lg: 0 24px 54px -18px rgba(47, 56, 33, .28);
+}
+
+html[data-bo-theme="dark"] {
+  color-scheme: dark;
+  --bo-bg: #181B15;
+  --bo-paper: #20241B;
+  --bo-panel: #1B1F17;
+  --bo-cream: #20241B;
+  --bo-cream-2: #181B15;
+  --bo-cream-3: #272C20;
+  --bo-ink: #F4F1E8;
+  --bo-ink-soft: #C5C4B8;
+  --bo-ink-muted: #858B7C;
+  --bo-hairline: rgba(244, 241, 232, .11);
+  --bo-hairline-strong: rgba(244, 241, 232, .20);
+  --bo-sb: #11140F;
+  --bo-sb-2: #181B15;
+  --bo-sb-hover: rgba(244, 241, 232, .07);
+  --bo-sb-active: rgba(240, 90, 67, .14);
+  --bo-sb-text: #C5C4B8;
+  --bo-sb-text-strong: #F4F1E8;
+  --bo-sb-text-muted: #858B7C;
+  --bo-sb-hairline: rgba(244, 241, 232, .11);
+  --bo-brand: #F05A43;
+  --bo-brand-2: #C84332;
+  --bo-brand-soft: rgba(240, 90, 67, .14);
+  --bo-brand-mid: rgba(240, 90, 67, .30);
+  --bo-emerald-500: #82C992;
+  --bo-emerald-600: #4FAD69;
+  --bo-emerald-400: #A8DFB0;
+  --bo-emerald-soft: rgba(130, 201, 146, .14);
+  --bo-emerald-ring: rgba(130, 201, 146, .26);
+  --bo-amber: #F2B35F;
+  --bo-amber-2: #D7923F;
+  --bo-amber-soft: rgba(242, 179, 95, .14);
+  --bo-amber-tint: rgba(242, 179, 95, .09);
+  --bo-ok: #82C992;
+  --bo-ok-soft: rgba(130, 201, 146, .14);
+  --bo-warn: #F2B35F;
+  --bo-warn-soft: rgba(242, 179, 95, .14);
+  --bo-err: #F05A43;
+  --bo-err-soft: rgba(240, 90, 67, .14);
+  --bo-info: #8DB6D9;
+  --bo-info-soft: rgba(141, 182, 217, .14);
+  --bo-shadow-sm: 0 1px 2px rgba(0, 0, 0, .24), 0 8px 24px -16px rgba(0, 0, 0, .65);
+  --bo-shadow: 0 12px 28px -16px rgba(0, 0, 0, .76);
+  --bo-shadow-lg: 0 28px 60px -20px rgba(0, 0, 0, .86);
+}
+
+html,
+body {
+  font-family: var(--bo-font);
+}
+
+body,
+.bo-shell {
+  background: var(--bo-bg);
+  color: var(--bo-ink);
+}
+
+html[data-bo-theme="dark"] body,
+html[data-bo-theme="dark"] .bo-shell {
+  background: linear-gradient(160deg, #11140F 0%, #181B15 100%);
+}
+
+/* Tomato for actions, olive for neutral active states. */
+.bo-sidebar-mark {
+  background: linear-gradient(135deg, #D0362B, #A32720);
+  color: #FFFFFF;
+  box-shadow: 0 8px 18px -8px rgba(208, 54, 43, .65);
+}
+.bo-sidebar-link.is-active {
+  background: linear-gradient(135deg, #D0362B, #A32720);
+  color: #FFFFFF;
+  box-shadow: 0 10px 20px -12px rgba(208, 54, 43, .75);
+}
+.bo-sidebar-link.is-active svg { color: #FFFFFF; }
+button[data-variant="default"],
+.bo-schedule-save,
+.bo-action-confirm {
+  background: linear-gradient(135deg, #D0362B, #A32720) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 8px 18px -10px rgba(208, 54, 43, .75) !important;
+}
+.bo-status-chip.is-active {
+  background: linear-gradient(135deg, #2B301F, #11140F);
+  color: #F4F1E8;
+  border-color: transparent;
+}
+.bo-daterange-pill.is-active,
+.bo-cal-btn-primary {
+  background: linear-gradient(135deg, #D0362B, #A32720) !important;
+  color: #FFFFFF !important;
+}
+.bo-kpi:first-child {
+  background: linear-gradient(135deg, #2B301F, #11140F);
+  color: #F4F1E8;
+  border-color: transparent;
+}
+.bo-kpi:first-child .bo-kpi-label { color: rgba(244, 241, 232, .72); }
+.bo-kpi:first-child .bo-kpi-value { color: #F4F1E8; }
+.bo-kpi:first-child .bo-kpi-hint { color: rgba(244, 241, 232, .56); }
+.bo-kpi-ok .bo-kpi-value { color: var(--bo-ok); }
+.bo-kpi-warn .bo-kpi-value { color: var(--bo-warn); }
+.bo-kpi-danger .bo-kpi-value { color: var(--bo-err); }
+.bo-metric-card-icon {
+  background: var(--bo-emerald-soft);
+  color: var(--bo-emerald-600);
+}
+.bo-driver-badge.is-available { background: var(--bo-emerald-soft); color: var(--bo-emerald-600); }
+.bo-driver-badge.is-busy { background: var(--bo-warn-soft); color: var(--bo-warn); }
+.bo-driver-badge.is-offline { background: var(--bo-cream-3); color: var(--bo-ink-muted); }
+.bo-inline-alert-success { background: var(--bo-ok-soft); border-color: var(--bo-emerald-ring); color: var(--bo-emerald-600); }
+.bo-inline-alert-error { background: var(--bo-err-soft); border-color: var(--bo-brand-mid); color: var(--bo-err); }
+
+html[data-bo-theme="dark"] .bo-kpi:first-child {
+  background: linear-gradient(135deg, #2B301F, #11140F);
+  color: #F4F1E8;
+}
+html[data-bo-theme="dark"] .bo-kpi:first-child .bo-kpi-label { color: rgba(244, 241, 232, .72); }
+html[data-bo-theme="dark"] .bo-kpi:first-child .bo-kpi-value { color: #F4F1E8; }
+html[data-bo-theme="dark"] .bo-kpi:first-child .bo-kpi-hint { color: rgba(244, 241, 232, .56); }
+html[data-bo-theme="dark"] .bo-sidebar-mark,
+html[data-bo-theme="dark"] .bo-sidebar-link.is-active {
+  background: linear-gradient(135deg, #F05A43, #C84332);
+  color: #FFFFFF;
+}
+html[data-bo-theme="dark"] .bo-sidebar-link.is-active svg { color: #FFFFFF; }
+html[data-bo-theme="dark"] .bo-status-chip.is-active,
+html[data-bo-theme="dark"] .bo-daterange-pill.is-active,
+html[data-bo-theme="dark"] .bo-cal-btn-primary {
+  background: linear-gradient(135deg, #F05A43, #C84332) !important;
+  color: #FFFFFF !important;
+}
+html[data-bo-theme="dark"] .bo-topbar-status.is-live { color: var(--bo-amber); }
+html[data-bo-theme="dark"] .bo-topbar-user-avatar {
+  background: linear-gradient(135deg, #F2B35F, #D7923F);
+  color: #181B15;
+}
+html[data-bo-theme="dark"] input,
+html[data-bo-theme="dark"] textarea,
+html[data-bo-theme="dark"] select,
+html[data-bo-theme="dark"] .bo-native-select {
+  background: var(--bo-cream-3);
+  color: var(--bo-ink);
+  border-color: var(--bo-hairline-strong);
+}
+html[data-bo-theme="dark"] .bo-table thead th { background: var(--bo-cream-3); }
+html[data-bo-theme="dark"] .bo-table tbody tr:hover td {
+  background: var(--bo-cream-3);
+  color: inherit;
+}
+html[data-bo-theme="dark"] .bo-kpi-ok,
+html[data-bo-theme="dark"] .bo-kpi-warn,
+html[data-bo-theme="dark"] .bo-kpi-danger {
+  background: linear-gradient(180deg, var(--bo-cream-3), var(--bo-paper) 68%);
+}
+
+/* ── STABLE NAVIGATION ──────────────────────────────────────────────────────
+ * The back-office page is the scroll container. The navigation owns the
+ * viewport edge and the content reserves its width, so cards never slide
+ * underneath the sidebar or the topbar while an operator scrolls.
+ */
+:root { --bo-sidebar-width: 264px; }
+.bo-shell { display: block; min-height: 100vh; }
+.bo-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--bo-sidebar-width);
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: 40;
+}
+.bo-frame { min-height: 100vh; margin-left: var(--bo-sidebar-width); }
+.bo-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bo-bg);
+  border-bottom: 1px solid var(--bo-hairline);
+}
+.bo-main { min-height: calc(100vh - 80px); }
+
+@media (max-width: 1080px) {
+  :root { --bo-sidebar-width: 68px; }
+  .bo-sidebar { width: var(--bo-sidebar-width); }
+  .bo-frame { margin-left: var(--bo-sidebar-width); }
+}
+
+/* Semantic states stay independent from the tomato brand accent. */
+.bo-status.bo-status-ok,
+.bo-status.bo-status-published {
+  color: #2f7d4a !important;
+  background: rgba(47, 125, 74, 0.12) !important;
+  border-color: rgba(47, 125, 74, 0.2) !important;
+}
+
+.bo-status.bo-status-err {
+  color: #b42318 !important;
+  background: rgba(180, 35, 24, 0.1) !important;
+  border-color: rgba(180, 35, 24, 0.18) !important;
+}
+
+.bo-alert[data-kind="success"],
+.bo-inline-alert-success {
+  color: #2f7d4a !important;
+  background: rgba(47, 125, 74, 0.1) !important;
+  border-color: #2f7d4a !important;
+}
+
+.bo-alert[data-kind="error"],
+.bo-inline-alert-error {
+  color: #b42318 !important;
+  background: rgba(180, 35, 24, 0.1) !important;
+  border-color: #b42318 !important;
+}
 /* PALETTE FINALE - Black Iris + Frozen (dyslove.design inspiration)
  * Black Iris #080813 (deep purple-black) + Frozen #A0BDDB (icy soft blue)
  * Applique en dernier pour ecraser toutes les palettes precedentes.
@@ -2358,3 +2631,58 @@ html[data-bo-theme="dark"] [data-slot="select-content"] {
   color: var(--bo-ink) !important;
   border-color: var(--bo-hairline) !important;
 }
+
+/* Last cascade layer: surfaces shared with the driver PWA. */
+html[data-bo-theme="dark"] {
+  --bo-sb: #11140F;
+  --bo-sb-2: #181B15;
+  --bo-sb-hover: rgba(244, 241, 232, 0.07);
+  --bo-sb-active: rgba(240, 90, 67, 0.18);
+  --bo-sb-text: #C5C4B8;
+  --bo-sb-text-strong: #F4F1E8;
+  --bo-sb-text-muted: #858B7C;
+  --bo-sb-hairline: rgba(244, 241, 232, 0.11);
+  --bo-bg: #181B15;
+  --bo-paper: #20241B;
+  --bo-panel: #1B1F17;
+  --bo-cream: #20241B;
+  --bo-cream-2: #1B1F17;
+  --bo-cream-3: #272C20;
+  --bo-ink: #F4F1E8;
+  --bo-ink-soft: #C5C4B8;
+  --bo-ink-muted: #858B7C;
+  --bo-hairline: rgba(244, 241, 232, 0.11);
+  --bo-hairline-strong: rgba(244, 241, 232, 0.20);
+}
+html[data-bo-theme="dark"] body,
+html[data-bo-theme="dark"] .bo-shell {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(130, 201, 146, .09), transparent 28%),
+    linear-gradient(160deg, #11140F 0%, #181B15 100%);
+}
+html[data-bo-theme="dark"] body {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(130, 201, 146, .09), transparent 28%),
+    linear-gradient(160deg, #11140F 0%, #181B15 100%);
+}
+html[data-bo-theme="dark"] .bo-sidebar { background: #11140F; }
+html[data-bo-theme="dark"] .bo-table-wrap,
+html[data-bo-theme="dark"] .bo-stats-section,
+html[data-bo-theme="dark"] .bo-loyalty-settings,
+html[data-bo-theme="dark"] .bo-drivers-form,
+html[data-bo-theme="dark"] .bo-panel,
+html[data-bo-theme="dark"] .bo-stats-filterbar,
+html[data-bo-theme="dark"] .bo-filters,
+html[data-bo-theme="dark"] .bo-kpi,
+html[data-bo-theme="dark"] .bo-driver-card,
+html[data-bo-theme="dark"] .bo-metric-card { background: #20241B; }
+html[data-bo-theme="dark"] .bo-topbar,
+html[data-bo-theme="dark"] .bo-topbar-search,
+html[data-bo-theme="dark"] .bo-topbar-icon-btn,
+html[data-bo-theme="dark"] .bo-topbar-user { background: #181B15; }
+html[data-bo-theme="dark"] .bo-table thead th,
+html[data-bo-theme="dark"] input,
+html[data-bo-theme="dark"] textarea,
+html[data-bo-theme="dark"] select,
+html[data-bo-theme="dark"] .bo-native-select,
+html[data-bo-theme="dark"] .bo-empty { background: #272C20; }

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { DRIVER_PHONE, DRIVER_PIN, updateOrderStatus } from "./helpers.js";
 
 // Point exact de livraison sans carte : permission de localisation demandee
 // des l arrivee, puis deux options au checkout (lien Google Maps colle /
@@ -6,9 +7,6 @@ import { expect, test } from "@playwright/test";
 // par ordre de priorite : 1. lien du client, 2. position exacte, 3. adresse
 // + commune en dernier recours.
 
-const ADMIN_TOKEN = process.env.E2E_ADMIN_TOKEN || "e2e-admin-token-abcdef";
-const DRIVER_PHONE = "+213 555 000 001";
-const DRIVER_PIN = "1234";
 const HYDRA = { latitude: 36.7503, longitude: 3.0441 };
 const GEO_KEY = "galatee.geolocation";
 const FULL_LINK = "https://www.google.com/maps/place/Hydra/@36.748,3.035,15z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d36.7512!4d3.0398!16s";
@@ -22,19 +20,18 @@ async function readGeolocationStore(page) {
   return page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) || "null"), GEO_KEY);
 }
 
+// Meme parcours que order-client.spec.js : plat preselectionne via ?dish=.
 async function goToCheckout(page, firstName) {
-  await page.goto("/commande");
-  const addChip = page.getByRole("button", { name: /Spaghetti Pomodoro E2E/i }).first();
-  await expect(addChip).toBeVisible({ timeout: 15_000 });
-  await addChip.click();
+  await page.goto("/commande?dish=spaghetti-pomodoro");
+  await expect(page.getByRole("heading", { name: /Ta sélection/i })).toBeVisible();
   await page.getByRole("button", { name: /Confirmer ma sélection/i }).click();
-  await expect(page).toHaveURL(/\/commande\/coordonnees$/);
+  await expect(page.getByRole("heading", { name: /Tes coordonnées/i })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Prénom", exact: true }).fill(firstName);
   await page.getByRole("textbox", { name: "Nom", exact: true }).fill("Localisation");
-  await page.getByRole("textbox", { name: /Téléphone/i }).fill("+213555111222");
-  await page.getByRole("combobox", { name: /Commune/i }).selectOption("hydra");
-  await page.getByRole("textbox", { name: /Adresse de livraison/i }).fill(`Adresse ${firstName}, Hydra`);
+  await page.getByLabel("Téléphone").fill("+213555111222");
+  await page.getByRole("combobox").selectOption("hydra");
+  await page.getByLabel("Adresse de livraison").fill(`Adresse ${firstName}, Hydra`);
   // Plus de carte Leaflet sur la page.
   await expect(page.locator(".leaflet-container")).toHaveCount(0);
 }
@@ -57,28 +54,23 @@ async function submitOrder(page) {
 // Confirme la commande cote admin, connecte le livreur, prend la course et
 // renvoie le lien de navigation affiche sur sa carte.
 async function driverNavigation(page, request, order) {
-  const confirm = await request.patch(`/api/admin/orders/${order.id}/status`, {
-    headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
-    data: { status: "confirmed" },
-  });
-  expect(confirm.status()).toBe(200);
+  await updateOrderStatus(request, order.id, "confirmed");
 
   // Chaque test a un contexte neuf : le livreur n est jamais deja connecte.
-  await page.goto("/livreur");
-  await expect(page).toHaveURL(/\/livreur\/login$/);
-  await page.getByPlaceholder(/^\+213/).fill(DRIVER_PHONE);
-  await page.getByPlaceholder(/^••••$/).fill(DRIVER_PIN);
-  await page.getByRole("button", { name: /Se connecter/i }).click();
-  await expect(page).toHaveURL(/\/livreur\/?$/);
+  await page.goto("/livreur/login");
+  await page.getByLabel("Téléphone").fill(DRIVER_PHONE);
+  await page.getByLabel("Code PIN").fill(DRIVER_PIN);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByText("Tableau de bord", { exact: true })).toBeVisible();
 
-  const shortNumber = order.orderNumber.split("-").pop();
-  const poolCard = page.locator("article.pbg-drv-card-pool").filter({ hasText: `#${shortNumber}` });
+  const customer = `${order.firstName} ${order.lastName}`;
+  const poolCard = page.locator("article.pbg-drv-card-pool").filter({ hasText: customer });
   await expect(poolCard).toBeVisible({ timeout: 15_000 });
   await poolCard.getByRole("button", { name: /Prendre cette course/i }).click();
 
-  const mineCard = page.locator("article.pbg-drv-card-mine").filter({ hasText: `#${shortNumber}` });
+  const mineCard = page.locator("article.pbg-drv-card-mine").filter({ hasText: customer });
   await expect(mineCard).toBeVisible();
-  const navLink = mineCard.locator("a.pbg-drv-link-chip").first();
+  const navLink = mineCard.locator("a[data-location-source]");
   return {
     href: await navLink.getAttribute("href"),
     source: await navLink.getAttribute("data-location-source"),

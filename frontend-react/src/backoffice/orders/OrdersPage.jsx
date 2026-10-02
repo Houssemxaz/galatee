@@ -62,8 +62,10 @@ export default function OrdersPage() {
   const [drivers, setDrivers] = useState([]);
   const [notificationPermission, setNotificationPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const knownPendingRef = useRef(null);
   const audioRef = useRef(null);
+  // Miroir ref du state pour lecture synchrone depuis notifyNewOrders (capture par load()).
   const audioUnlockedRef = useRef(false);
 
   function ensureAudio() {
@@ -101,6 +103,7 @@ export default function OrdersPage() {
         audio.pause();
         audio.currentTime = 0;
         audioUnlockedRef.current = true;
+        setAudioUnlocked(true);
       } catch { /* autoplay peut echouer si le geste est trop indirect — on retentera au prochain clic */ }
     }
     if (typeof Notification === "undefined") return;
@@ -321,9 +324,12 @@ export default function OrdersPage() {
         <Input placeholder="N° commande, client, téléphone…" value={search} onChange={(event) => setSearch(event.target.value)} />
       </div>
       <Button variant="outline" size="sm" onClick={load} aria-label="Rafraîchir les commandes"><RefreshCw size={14} /></Button>
-      {notificationPermission !== "granted" && notificationPermission !== "unsupported" && (
-        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer les notifications de nouvelles commandes">
-          <Bell size={14} /> <span>Activer les alertes</span>
+      {/* Visible tant que le son n est pas debloque, meme si l API Notification
+          est indisponible (contexte HTTP non securise) : ce clic est le seul
+          endroit qui debloque l autoplay. */}
+      {!audioUnlocked && (
+        <Button variant="outline" size="sm" onClick={enableNotifications} title="Activer le son de nouvelle commande (et les notifications navigateur si supportees)">
+          <Bell size={14} /> <span>Activer les alertes sonores</span>
         </Button>
       )}
     </section>

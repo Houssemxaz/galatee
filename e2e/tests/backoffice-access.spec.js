@@ -1,39 +1,25 @@
-import { expect, test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { ADMIN_TOKEN } from "./helpers.js";
 
-const ADMIN_TOKEN = process.env.E2E_ADMIN_TOKEN || "e2e-admin-token-abcdef";
+test("le back-office refuse les requêtes anonymes et accepte le token admin", async ({ page, request }) => {
+  const anonymous = await request.get("/api/admin/orders");
+  expect(anonymous.status()).toBe(401);
 
-test("backoffice refuse les requetes admin sans token", async ({ request }) => {
-  const noHeader = await request.get("/api/admin/menu");
-  expect(noHeader.status()).toBe(401);
-
-  const badHeader = await request.get("/api/admin/menu", {
-    headers: { Authorization: "Bearer WRONG-TOKEN" },
+  const wrong = await request.get("/api/admin/orders", {
+    headers: { Authorization: "Bearer wrong-token" },
   });
-  expect(badHeader.status()).toBe(401);
+  expect(wrong.status()).toBe(401);
 
-  const good = await request.get("/api/admin/menu", {
+  const authorized = await request.get("/api/admin/orders", {
     headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
   });
-  expect(good.status()).toBe(200);
-});
+  expect(authorized.status()).toBe(200);
 
-test("backoffice UI charge la section Commandes avec le bon token", async ({ page }) => {
-  // Le token est stocke par le backoffice dans sessionStorage sous la cle
-  // "galatee.adminToken" (voir frontend-react/src/backoffice/api.js). On l
-  // injecte avant le premier document pour simuler un admin deja loggue.
-  await page.addInitScript((token) => {
-    try { window.sessionStorage.setItem("galatee.adminToken", token); } catch { /* private mode */ }
-  }, ADMIN_TOKEN);
-
-  await page.goto("/backoffice.html");
-
-  // Le shell backoffice charge la liste des commandes via /api/admin/orders.
-  const ordersResponse = await page.waitForResponse(
-    (r) => r.url().includes("/api/admin/orders") && r.request().method() === "GET",
-    { timeout: 15_000 },
+  await page.addInitScript((token) => sessionStorage.setItem("galatee.adminToken", token), ADMIN_TOKEN);
+  const ordersResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/orders") && response.request().method() === "GET",
   );
-  expect(ordersResponse.status()).toBe(200);
-
-  // Le shell affiche bien les sections principales.
-  await expect(page.getByRole("heading", { name: /Commandes/i, level: 1 })).toBeVisible();
+  await page.goto("/backoffice.html");
+  await ordersResponse;
+  await expect(page.getByRole("heading", { name: "Commandes", exact: true }).first()).toBeVisible();
 });

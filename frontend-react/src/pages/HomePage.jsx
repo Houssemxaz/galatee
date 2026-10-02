@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, PackageX } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import BrandMarquee from "@/components/BrandMarquee";
 import TiltCard from "@/components/TiltCard";
@@ -8,22 +8,30 @@ import ShineCTA from "@/components/ShineCTA";
 import DishImage from "@/components/DishImage";
 import SEO from "@/components/SEO";
 import { fetchMenu, trackEvent } from "@/lib/api";
+import { formatDzd } from "@/lib/formatters";
 
 function MenuTeaserCard({ dish, index }) {
   return (
     <Reveal className="home-menu-card-reveal" delay={index * 80}>
-      <TiltCard>
-        <Link className="home-menu-card" to={`/menu/${dish.slug}`} aria-label={`Voir ${dish.title}`}>
-          <div className="home-menu-card-media">
-            <DishImage dish={dish} sizes="(max-width: 720px) 90vw, 33vw" />
-            <span className="home-menu-card-cta"><ArrowUpRight size={14} strokeWidth={2} /> Voir la fiche</span>
-          </div>
-          <div className="home-menu-card-body">
-            <span className="home-menu-card-label">{dish.label}</span>
+      <TiltCard as={Link} to={`/menu/${dish.slug}`} className="home-menu-card" aria-label={`Voir ${dish.title}`}>
+        <div className="home-menu-card-media">
+          <DishImage dish={dish} sizes="(max-width: 720px) 90vw, 33vw" />
+          <span className="home-menu-card-cta"><ArrowUpRight size={14} strokeWidth={2} /> Voir la fiche</span>
+        </div>
+        <div className="home-menu-card-body">
+          <span className="home-menu-card-label">{dish.label}</span>
+          <div className="home-menu-card-title-row">
             <h3 className="home-menu-card-title">{dish.title}</h3>
-            <p className="home-menu-card-summary">{dish.summary}</p>
+            <span className="home-menu-card-price">{formatDzd(dish.priceCents)}</span>
           </div>
-        </Link>
+          <p className="home-menu-card-summary">{dish.summary}</p>
+          {!dish.available && (
+            <span className="home-menu-card-stock" role="status">
+              <PackageX size={13} strokeWidth={1.8} />
+              <span>Rupture de stock</span>
+            </span>
+          )}
+        </div>
       </TiltCard>
     </Reveal>
   );
@@ -143,14 +151,22 @@ export default function HomePage() {
       {/* ═══ 01 — MENU PREVIEW (cream) ═══ */}
       <section className="home-section home-menu pbg-section pbg-section-cream" id="home-menu" aria-labelledby="home-menu-title">
         <div className="page-shell">
-          <Reveal className="pbg-section-head">
+          <div className="home-menu-illustration-rail" aria-hidden="true">
+            <img
+              className="home-section-signature home-menu-art home-menu-art-bottom"
+              src="/assets/brand/ingredient-ravioli-wheel.png"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <Reveal className="pbg-section-head home-menu-section-head">
             <div className="pbg-section-index">
               <span>01</span><i />La carte
             </div>
             <div className="pbg-section-heading">
               <h2 id="home-menu-title" className="pbg-section-title">
-                Fresh pasta,
-                <br /><em>every day.</em>
+                Fresh pasta, <em>every day.</em>
               </h2>
               <p className="pbg-section-lede">Pâtes fraîches, sauces à la minute, garnitures de saison. Une carte courte, généreuse et vivante.</p>
             </div>
@@ -188,15 +204,35 @@ export default function HomePage() {
               <br /><em>le temps.</em>
             </h2>
             <p className="pbg-section-lede">Le service commence à 19h. Toute commande est confirmée par notre équipe sous 24h. Une envie particulière ? Glisse-la dans le formulaire.</p>
-            <div className="pbg-reservation-meta">
-              <div><span>Service</span><p>Mer — Sam</p></div>
-              <div><span>Horaires</span><p>19h — 23h30</p></div>
-              <div><span>Format</span><p>Livraison ou retrait</p></div>
-            </div>
             <Link to="/commande" onClick={() => trackEvent("order_cta_clicked")} className="pbg-btn pbg-btn-primary">
               <span>Commander</span>
               <ArrowUpRight size={16} strokeWidth={1.6} />
             </Link>
+          </Reveal>
+
+          <Reveal className="home-order-sign club-membership-card" delay={120}>
+            <div className="home-order-sign-inner club-membership-inner">
+              <header className="club-membership-head">
+                <p className="club-membership-eyebrow">Infos commande</p>
+                <p className="club-membership-serial">— 02 / 03 —</p>
+              </header>
+
+              <div className="home-order-sign-heading">
+                <p className="club-membership-cursive">Pasta by Galatée</p>
+                <p className="club-membership-name">On s'organise.</p>
+              </div>
+
+              <div className="home-order-sign-grid">
+                <div><span>Service</span><strong>Mer — Sam</strong></div>
+                <div><span>Horaires</span><strong>19h — 23h30</strong></div>
+                <div><span>Format</span><strong>Livraison ou retrait</strong></div>
+              </div>
+
+              <footer className="club-membership-foot">
+                <span>Commande en ligne</span>
+                <span>Hydra · Alger</span>
+              </footer>
+            </div>
           </Reveal>
         </div>
       </section>
@@ -204,6 +240,14 @@ export default function HomePage() {
       {/* ═══ 03 — INFORMATIONS TEASER ═══ */}
       <section className="home-section home-info-teaser pbg-section pbg-section-warm" id="home-info" aria-labelledby="home-info-title">
         <div className="page-shell">
+          <img
+            className="home-section-signature home-info-art"
+            src="/assets/brand/ingredient-sauce-bowl.png"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+          />
           <Reveal className="pbg-section-head">
             <div className="pbg-section-index">
               <span>03</span><i />Informations

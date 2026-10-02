@@ -1,24 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryRateLimiter } from "./rateLimit.js";
+import { InMemoryRateLimiter, RedisRateLimiter } from "./rateLimit.js";
 
-test("InMemoryRateLimiter counts up to max then blocks with retry-after", () => {
-  const limiter = new InMemoryRateLimiter({ windowMs: 60_000, max: 3, name: "test" });
-  const now = 1_000_000;
-  assert.deepEqual({ ...limiter.hit("k", now), retryAfterSeconds: 0 }, { allowed: true, retryAfterSeconds: 0, remaining: 2 });
-  limiter.hit("k", now);
-  limiter.hit("k", now);
-  const denied = limiter.hit("k", now);
-  assert.equal(denied.allowed, false);
-  assert.ok(denied.retryAfterSeconds >= 1);
+test("InMemoryRateLimiter returns a retry window after the limit", () => {
+  const limiter = new InMemoryRateLimiter({ windowMs: 1000, max: 1, name: "test" });
+  assert.equal(limiter.hit("client", 0).allowed, true);
+  const blocked = limiter.hit("client", 100);
+  assert.equal(blocked.allowed, false);
+  assert.equal(blocked.retryAfterSeconds, 1);
+  assert.equal(limiter.hit("client", 1001).allowed, true);
 });
 
-test("InMemoryRateLimiter resets the bucket after the window elapses", () => {
-  const limiter = new InMemoryRateLimiter({ windowMs: 1_000, max: 1, name: "test" });
-  const first = limiter.hit("k", 1_000);
-  assert.equal(first.allowed, true);
-  const second = limiter.hit("k", 1_500);
-  assert.equal(second.allowed, false);
-  const third = limiter.hit("k", 2_500);
-  assert.equal(third.allowed, true);
+test("RedisRateLimiter keeps the window and counter in the shared client", async () => {
+  const values = new Map();
+  const client = {
+    async eval(_script, { keys, arguments: args }) {
+      const key = keys[0];
+      const current = (values.get(key)?.count || 0) + 1;
+      values.set(key, { count: current, ttl: Number(args[0]) });
+      return [current, values.get(key).ttl];
+    },
+  };
+  const limiter = new RedisRateLimiter({ client, windowMs: 1_000, max: 1, name: "orders" });
+
+  assert.deepEqual(await limiter.hit("orders:ip"), { allowed: true, remaining: 0, retryAfterSeconds: 0 });
+  assert.deepEqual(await limiter.hit("orders:ip"), { allowed: false, remaining: 0, retryAfterSeconds: 1 });
 });

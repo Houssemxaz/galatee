@@ -6,8 +6,8 @@
   "scope": "/livreur",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5EFE4",
-  "theme_color": "#D0362B",
+  "background_color": "#11140F",
+  "theme_color": "#11140F",
   "lang": "fr",
   "categories": ["business", "productivity"],
   "icons": [

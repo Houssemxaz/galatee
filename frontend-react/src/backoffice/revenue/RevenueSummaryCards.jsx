@@ -14,9 +14,9 @@ export default function RevenueSummaryCards({ dashboard }) {
 
   const cards = [
     { label: "Revenus", value: `${totals.revenue} ${dashboard.currency}`, delta: revenueDelta },
-    { label: "Demandées", value: totals.reservations.requested },
-    { label: "Confirmées", value: totals.reservations.confirmed },
-    { label: "Annulées", value: totals.reservations.cancelled },
+    { label: "Commandes reçues", value: totals.orders.received },
+    { label: "Commandes confirmées", value: totals.orders.confirmed },
+    { label: "Commandes annulées", value: totals.orders.cancelled },
   ];
 
   return (

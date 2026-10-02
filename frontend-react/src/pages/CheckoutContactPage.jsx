@@ -5,15 +5,14 @@ import DeliveryLocationPicker from "@/components/DeliveryLocationPicker";
 import Reveal from "@/components/Reveal";
 import ShineCTA from "@/components/ShineCTA";
 import SEO from "@/components/SEO";
+import { calculateRewardDiscountCents, calculateRewardDiscountForLines, getEligibleLines, isRewardApplicable, rewardCalculationLabel } from "@/lib/loyalty";
+import { getBestPromotion } from "@/lib/promotions";
 import { createOrder, fetchCustomerOrders, fetchDeliveryCommunes, fetchMenu, trackEvent } from "@/lib/api";
 import { useCustomerAuth } from "@/context/CustomerAuthContext";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { useCheckoutForm } from "@/context/CheckoutFormContext";
-
-function formatDzd(cents) {
-  return `${new Intl.NumberFormat("fr-DZ").format(Math.round(Number(cents || 0) / 100))} DA`;
-}
+import { formatDzd } from "@/lib/formatters";
 
 export default function CheckoutContactPage() {
   const navigate = useNavigate();
@@ -59,16 +58,24 @@ export default function CheckoutContactPage() {
   const selectedCommune = communes.find((commune) => commune.id === form.communeId);
   const deliveryFee = form.deliveryMode === "delivery" ? (selectedCommune?.feeCents || 0) : 0;
   const reward = loyalty?.rewardAvailable;
-  const eligibleIds = loyalty?.settings?.eligibleDishIds || [];
-  const eligibleSubtotal = eligibleIds.length
-    ? lines.filter((item) => eligibleIds.includes(item.id)).reduce((sum, item) => sum + item.lineTotal, 0)
-    : subtotal;
-  const discount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId
-    ? reward.rewardType === "fixed"
-      ? Math.min(eligibleSubtotal, reward.rewardValue * 100)
-      : Math.min(eligibleSubtotal, Math.floor(eligibleSubtotal * reward.rewardValue / 100))
+  const loyaltySettings = loyalty?.settings || {};
+  const eligibleIds = loyaltySettings.eligibleDishIds || [];
+  const eligibleLines = getEligibleLines(lines, loyaltySettings);
+  const eligibleSubtotal = eligibleLines.reduce((sum, item) => sum + item.lineTotal, 0);
+  const rewardApplicable = isRewardApplicable(lines, loyaltySettings);
+  const loyaltyDiscount = form.loyaltyRewardId && reward?.id === form.loyaltyRewardId && rewardApplicable
+    ? loyaltySettings.rewardScope === "pack"
+      ? calculateRewardDiscountCents(eligibleSubtotal, reward.rewardType, reward.rewardValue)
+      : calculateRewardDiscountForLines(eligibleLines, reward.rewardType, reward.rewardValue)
     : 0;
+  const directPromotion = useMemo(() => getBestPromotion(lines, menu.promotions || []), [lines, menu]);
+  const discount = Math.max(directPromotion?.discountCents || 0, loyaltyDiscount);
+  const directPromotionApplied = directPromotion && directPromotion.discountCents >= loyaltyDiscount;
   const total = Math.max(0, subtotal + deliveryFee - discount);
+
+  useEffect(() => {
+    if (form.loyaltyRewardId && reward && !rewardApplicable) updateForm("loyaltyRewardId", "");
+  }, [form.loyaltyRewardId, reward, rewardApplicable, updateForm]);
 
   // Redirect back to /commande if the cart is empty (deep-linked with nothing to buy).
   useEffect(() => {
@@ -232,14 +239,25 @@ export default function CheckoutContactPage() {
                   <strong>{formatDzd(subtotal)}</strong>
                 </p>
                 <p><span>Livraison</span><strong>{form.deliveryMode === "delivery" ? (selectedCommune ? formatDzd(deliveryFee) : "Selon commune") : "Retrait sur place"}</strong></p>
-                {discount > 0 && (
+                {directPromotionApplied && (
+                  <p className="order-inline-discount">
+                    <span>Promotion directe · {directPromotion.title}</span>
+                    <strong>− {formatDzd(directPromotion.discountCents)}</strong>
+                  </p>
+                )}
+                {discount > 0 && !directPromotionApplied && (
                   <p className="order-inline-discount">
                     <span>
                       🎁 Récompense fidélité
                       {reward?.rewardType === "percentage" && ` (−${reward.rewardValue}%)`}
                       {reward?.rewardType === "fixed" && ` (−${reward.rewardValue} DA)`}
                     </span>
-                    <strong>− {formatDzd(discount)}</strong>
+                    <strong>
+                      − {formatDzd(discount)}
+                      <small className="order-inline-discount-calculation">
+                        {rewardCalculationLabel(eligibleSubtotal, reward.rewardType, reward.rewardValue, formatDzd)}
+                      </small>
+                    </strong>
                   </p>
                 )}
                 <p className="order-inline-total">

@@ -15,7 +15,7 @@ function useDriverPwaChrome() {
     const prevManifest = manifestLink?.getAttribute("href");
     const prevTheme = themeMeta?.getAttribute("content");
     if (manifestLink) manifestLink.setAttribute("href", "/livreur.webmanifest");
-    if (themeMeta) themeMeta.setAttribute("content", "#D0362B");
+    if (themeMeta) themeMeta.setAttribute("content", "#11140F");
     return () => {
       if (manifestLink && prevManifest) manifestLink.setAttribute("href", prevManifest);
       if (themeMeta && prevTheme) themeMeta.setAttribute("content", prevTheme);

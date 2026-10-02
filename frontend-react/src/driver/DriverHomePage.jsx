@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BarChart3, Bike, CheckCircle2, LogOut, MapPin, Navigation, Package, Phone, RefreshCw,
-  X, ArrowUpRight, Undo2,
+  Activity, BarChart3, Bike, CheckCircle2, Clock3, LogOut, MapPin, Navigation, Package,
+  Phone, RefreshCw, WalletCards, Wifi, WifiOff, X, ArrowUpRight, Undo2,
 } from "lucide-react";
 import {
-  cancelOrder, deliverOrder, driverLogout, fetchDriverOrders, fetchDriverPool,
+  cancelDelivery, cancelOrder, deliverOrder, driverLogout, fetchDriverOrders, fetchDriverPool,
   releaseOrder, startDelivery, takeOrder, updateDriverStatus,
 } from "./api";
+import DriverBottomNav from "./DriverBottomNav.jsx";
 import { LOCATION_SOURCE_LABELS, orderLocationSource, orderMapsHref } from "@/lib/maps";
 
 const POLL_INTERVAL_MS = 8000;
@@ -154,10 +155,14 @@ export default function DriverHomePage({ driver, onDriverUpdated, onLoggedOut })
     }
     setBusyId(cancelDialog.order.id);
     try {
-      await cancelOrder(cancelDialog.order.id, reasonLabel);
+      if (cancelDialog.deliveryAttempt) {
+        await cancelDelivery(cancelDialog.order.id, reasonLabel);
+      } else {
+        await cancelOrder(cancelDialog.order.id, reasonLabel);
+      }
       setCancelDialog(null);
       await load();
-      flash("success", "Course annulée.");
+      flash("success", cancelDialog.deliveryAttempt ? "Livraison annulée et enregistrée." : "Course annulée.");
     } catch (error) {
       flash("error", error.message || "Impossible d'annuler.");
     } finally {
@@ -166,13 +171,14 @@ export default function DriverHomePage({ driver, onDriverUpdated, onLoggedOut })
   }
 
   const isOnline = driver.currentStatus === "available" || driver.currentStatus === "busy";
+  const assignedCash = orders.reduce((sum, order) => sum + Number(order.totalCents || 0), 0);
 
   return (
     <>
       <header className="pbg-drv-header">
         <div>
-          <p className="pbg-drv-hello">Salut,</p>
-          <p className="pbg-drv-firstname">{driver.firstName}</p>
+          <p className="pbg-drv-hello">Pasta by Galatée</p>
+          <p className="pbg-drv-firstname">Salut {driver.firstName}</p>
         </div>
         <div className="pbg-drv-header-actions">
           <Link to="/livreur/stats" className="pbg-drv-icon-btn" aria-label="Mes statistiques">
@@ -189,14 +195,42 @@ export default function DriverHomePage({ driver, onDriverUpdated, onLoggedOut })
         className={`pbg-drv-status-toggle ${isOnline ? "is-online" : "is-off"}`}
         onClick={toggleStatus}
       >
-        <span className="pbg-drv-status-dot" aria-hidden="true" />
-        <span className="pbg-drv-status-text">
-          {isOnline ? "Je suis dispo" : "En pause"}
+        <span className="pbg-drv-status-icon" aria-hidden="true">
+          {isOnline ? <Wifi size={18} strokeWidth={2} /> : <WifiOff size={18} strokeWidth={2} />}
         </span>
-        <span className="pbg-drv-status-sub">
-          {isOnline ? "Touchez pour passer en pause" : "Touchez pour revenir en ligne"}
+        <span className="pbg-drv-status-copy">
+          <span className="pbg-drv-status-eyebrow">Statut du service</span>
+          <span className="pbg-drv-status-text">{isOnline ? "Vous êtes en ligne" : "Vous êtes en pause"}</span>
+          <span className="pbg-drv-status-sub">
+            {isOnline ? "Les nouvelles courses peuvent arriver" : "Passez en ligne pour recevoir des courses"}
+          </span>
         </span>
+        <span className="pbg-drv-status-switch" aria-hidden="true"><span /></span>
       </button>
+
+      <section className="pbg-drv-overview" aria-label="Résumé de votre journée">
+        <div className="pbg-drv-overview-label">
+          <span>Tableau de bord</span>
+          <span className="pbg-drv-live"><Activity size={13} strokeWidth={2} /> Actualisé</span>
+        </div>
+        <div className="pbg-drv-overview-grid">
+          <div className="pbg-drv-metric pbg-drv-metric-primary">
+            <span className="pbg-drv-metric-icon"><Bike size={16} strokeWidth={2} /></span>
+            <strong>{orders.length}</strong>
+            <span>Courses actives</span>
+          </div>
+          <div className="pbg-drv-metric">
+            <span className="pbg-drv-metric-icon"><Package size={16} strokeWidth={2} /></span>
+            <strong>{pool.length}</strong>
+            <span>À prendre</span>
+          </div>
+          <div className="pbg-drv-metric">
+            <span className="pbg-drv-metric-icon"><WalletCards size={16} strokeWidth={2} /></span>
+            <strong>{formatDzd(assignedCash)}</strong>
+            <span>À encaisser</span>
+          </div>
+        </div>
+      </section>
 
       {toast && (
         <div className={`pbg-drv-toast pbg-drv-toast-${toast.kind}`} role="status">{toast.message}</div>
@@ -209,31 +243,41 @@ export default function DriverHomePage({ driver, onDriverUpdated, onLoggedOut })
       )}
 
       {/* ═══ MES COURSES EN COURS ═══ */}
-      <section className="pbg-drv-section">
+      <section className="pbg-drv-section" id="mes-courses">
         <h2 className="pbg-drv-section-title">
-          Mes courses <span className="pbg-drv-count">{orders.length}</span>
+          <span>Course active</span> <span className="pbg-drv-count">{orders.length}</span>
         </h2>
         {orders.length === 0 && (
-          <p className="pbg-drv-empty">Aucune course en cours. Prenez une course dispo ci-dessous.</p>
+          <div className="pbg-drv-empty pbg-drv-empty-featured">
+            <span className="pbg-drv-empty-icon"><Clock3 size={20} strokeWidth={1.8} /></span>
+            <strong>Aucune course active</strong>
+            <span>Prenez une course disponible pour commencer votre tournée.</span>
+          </div>
         )}
-        {orders.map((order) => (
+        {orders.map((order, index) => (
           <MyOrderCard
             key={order.id}
             order={order}
+            featured={index === 0}
             busy={busyId === order.id}
             onStart={() => handleStart(order)}
             onDeliver={() => setDeliverDialog({ order })}
-            onCancel={() => setCancelDialog({ order, reason: "customer_unreachable", custom: "" })}
+            onCancel={(deliveryAttempt = false) => setCancelDialog({
+              order,
+              reason: "customer_unreachable",
+              custom: "",
+              deliveryAttempt,
+            })}
             onRelease={() => handleRelease(order)}
           />
         ))}
       </section>
 
       {/* ═══ POOL DES COURSES DISPO ═══ */}
-      <section className="pbg-drv-section">
+      <section className="pbg-drv-section" id="courses-disponibles">
         <div className="pbg-drv-section-head">
           <h2 className="pbg-drv-section-title">
-            Courses disponibles <span className="pbg-drv-count">{pool.length}</span>
+            <span>À prendre</span> <span className="pbg-drv-count">{pool.length}</span>
           </h2>
           <button type="button" className="pbg-drv-icon-btn pbg-drv-icon-btn-sm" onClick={load} aria-label="Rafraîchir">
             <RefreshCw size={15} strokeWidth={1.8} />
@@ -271,6 +315,8 @@ export default function DriverHomePage({ driver, onDriverUpdated, onLoggedOut })
           busy={Boolean(busyId)}
         />
       )}
+
+      <DriverBottomNav onLogout={handleLogout} />
     </>
   );
 }
@@ -340,7 +386,7 @@ function PoolOrderCard({ order, busy, onTake }) {
   );
 }
 
-function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
+function MyOrderCard({ order, featured, busy, onStart, onDeliver, onCancel, onRelease }) {
   const isReady = order.status === "ready";
   const inTransit = Boolean(order.driverStartedAt);
   // Priorite : lien Google Maps du client, puis sa position exacte, puis
@@ -349,14 +395,18 @@ function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
   const precise = locationSource !== "address";
 
   return (
-    <article className="pbg-drv-card pbg-drv-card-mine">
+    <article className={`pbg-drv-card pbg-drv-card-mine ${featured ? "is-featured" : ""}`}>
       <header className="pbg-drv-card-head">
-        <span className="pbg-drv-order-num">#{order.orderNumber.split("-").pop()}</span>
+        <div>
+          {featured && <span className="pbg-drv-card-kicker">Prochaine course</span>}
+          <span className="pbg-drv-order-num">#{order.orderNumber.split("-").pop()}</span>
+        </div>
         <span className={`pbg-drv-kitchen-status is-${order.status}`}>
           {STATUS_LABEL[order.status] || order.status}
         </span>
       </header>
       <p className="pbg-drv-customer">{order.firstName} {order.lastName}</p>
+      {featured && <DeliveryProgress order={order} inTransit={inTransit} />}
       <div className="pbg-drv-card-links">
         <a
           href={orderMapsHref(order)}
@@ -393,14 +443,20 @@ function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
         </button>
       )}
       {inTransit && (
-        <button type="button" className="pbg-drv-btn pbg-drv-btn-success" onClick={onDeliver} disabled={busy}>
-          <CheckCircle2 size={17} strokeWidth={2} />
-          <span>Livrée et encaissée</span>
-        </button>
+        <div className="pbg-drv-final-actions">
+          <button type="button" className="pbg-drv-btn pbg-drv-btn-success" onClick={onDeliver} disabled={busy}>
+            <CheckCircle2 size={17} strokeWidth={2} />
+            <span>Livrée</span>
+          </button>
+          <button type="button" className="pbg-drv-btn pbg-drv-btn-danger" onClick={() => onCancel(true)} disabled={busy}>
+            <X size={17} strokeWidth={2} />
+            <span>Annulée</span>
+          </button>
+        </div>
       )}
 
       <div className="pbg-drv-card-secondary">
-        <button type="button" className="pbg-drv-link" onClick={onCancel} disabled={busy}>
+        <button type="button" className="pbg-drv-link" onClick={() => onCancel(false)} disabled={busy}>
           <X size={12} strokeWidth={2} /> Annuler la course
         </button>
         {!inTransit && (
@@ -410,6 +466,27 @@ function MyOrderCard({ order, busy, onStart, onDeliver, onCancel, onRelease }) {
         )}
       </div>
     </article>
+  );
+}
+
+function DeliveryProgress({ order, inTransit }) {
+  const ready = order.status === "ready" || inTransit;
+  return (
+    <div className="pbg-drv-progress" aria-label="Progression de la course">
+      <ProgressStep label="Prise" done />
+      <ProgressStep label="Prête" done={ready} active={order.status === "ready" && !inTransit} />
+      <ProgressStep label="En route" done={inTransit} active={inTransit} />
+      <ProgressStep label="Livrée" />
+    </div>
+  );
+}
+
+function ProgressStep({ label, done, active }) {
+  return (
+    <span className={`pbg-drv-progress-step ${done ? "is-done" : ""} ${active ? "is-active" : ""}`}>
+      <span className="pbg-drv-progress-dot" />
+      <span>{label}</span>
+    </span>
   );
 }
 
@@ -431,8 +508,12 @@ function CancelDialog({ state, onChange, onSubmit, onClose, busy }) {
   return (
     <div className="pbg-drv-dialog-back" onClick={onClose}>
       <form className="pbg-drv-dialog" onClick={(e) => e.stopPropagation()} onSubmit={onSubmit}>
-        <h3>Annuler la course</h3>
-        <p className="pbg-drv-dialog-note">Choisissez le motif — il sera visible dans le back-office.</p>
+        <h3>{state.deliveryAttempt ? "Livraison annulée" : "Annuler la course"}</h3>
+        <p className="pbg-drv-dialog-note">
+          {state.deliveryAttempt
+            ? "La commande ne sera pas comptée comme livrée. Choisissez le motif à transmettre au back-office."
+            : "Choisissez le motif — il sera visible dans le back-office."}
+        </p>
         <div className="pbg-drv-radios">
           {CANCEL_REASONS.map((r) => (
             <label key={r.value} className={`pbg-drv-radio ${state.reason === r.value ? "is-selected" : ""}`}>

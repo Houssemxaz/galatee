@@ -2,7 +2,7 @@ import { useRef } from "react";
 
 const MAX_TILT = 6;
 
-export default function TiltCard({ children, className = "", ...rest }) {
+export default function TiltCard({ as: Component = "div", children, className = "", ...rest }) {
   const ref = useRef(null);
 
   const handleMove = (event) => {
@@ -27,7 +27,7 @@ export default function TiltCard({ children, className = "", ...rest }) {
   };
 
   return (
-    <div
+    <Component
       ref={ref}
       className={`tilt-card ${className}`}
       onMouseMove={handleMove}
@@ -35,6 +35,6 @@ export default function TiltCard({ children, className = "", ...rest }) {
       {...rest}
     >
       <div className="tilt-card-inner">{children}</div>
-    </div>
+    </Component>
   );
 }

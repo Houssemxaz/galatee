@@ -3,6 +3,8 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypt
 const DRIVER_STATUSES = new Set(["offline", "available", "busy"]);
 const SESSION_COOKIE = "galatee_driver_session";
 const SESSION_TTL_DAYS = 30;
+const DRIVER_LOGIN_MAX_FAILURES = 5;
+const DRIVER_LOGIN_LOCKOUT_MS = 5 * 60 * 1000;
 
 export class DriverError extends Error {
   constructor(code, message, status = 400, details = {}) {
@@ -19,6 +21,7 @@ export class DriverSystem {
     if (!db) throw new Error("DriverSystem requires a SQLite database.");
     this.db = db;
     this.now = now;
+    this.loginFailures = new Map();
     this.initializeSchema();
   }
 
@@ -153,12 +156,27 @@ export class DriverSystem {
 
   loginWithPin({ phone, pin }, { userAgent = "" } = {}) {
     const normalizedPhone = normalizePhone(phone);
+    const nowMs = this.now().getTime();
+    const failure = this.loginFailures.get(normalizedPhone);
+    if (failure?.lockedUntil > nowMs) {
+      throw new DriverError(
+        "DRIVER_LOGIN_LOCKED",
+        "Trop de tentatives. Réessayez dans quelques minutes.",
+        429,
+        { retryAfterSeconds: Math.max(1, Math.ceil((failure.lockedUntil - nowMs) / 1000)) },
+      );
+    }
+    if (failure?.lockedUntil && failure.lockedUntil <= nowMs) {
+      this.loginFailures.delete(normalizedPhone);
+    }
+
     const normalizedPin = normalizePin(pin);
     const row = this.db.prepare("SELECT * FROM drivers WHERE phone = ?").get(normalizedPhone);
-    if (!row || !row.active) throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
+    if (!row || !row.active) return this.recordLoginFailure(normalizedPhone, nowMs);
     if (!verifyPin(normalizedPin, row.pin_hash, row.pin_salt)) {
-      throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
+      return this.recordLoginFailure(normalizedPhone, nowMs);
     }
+    this.loginFailures.delete(normalizedPhone);
     const sessionId = randomBytes(32).toString("hex");
     const nowDate = this.now();
     const nowIso = nowDate.toISOString();
@@ -169,6 +187,23 @@ export class DriverSystem {
     `).run(sessionId, row.id, nowIso, expiresAt, String(userAgent || "").slice(0, 200));
     this.db.prepare("UPDATE drivers SET last_seen_at = ? WHERE id = ?").run(nowIso, row.id);
     return { sessionId, driver: mapDriverRow(row), expiresAt };
+  }
+
+  recordLoginFailure(phone, nowMs) {
+    const previous = this.loginFailures.get(phone);
+    const attempts = (previous?.attempts || 0) + 1;
+    if (attempts >= DRIVER_LOGIN_MAX_FAILURES) {
+      const lockedUntil = nowMs + DRIVER_LOGIN_LOCKOUT_MS;
+      this.loginFailures.set(phone, { attempts, lockedUntil });
+      throw new DriverError(
+        "DRIVER_LOGIN_LOCKED",
+        "Trop de tentatives. Réessayez dans quelques minutes.",
+        429,
+        { retryAfterSeconds: Math.ceil(DRIVER_LOGIN_LOCKOUT_MS / 1000) },
+      );
+    }
+    this.loginFailures.set(phone, { attempts, lockedUntil: 0 });
+    throw new DriverError("DRIVER_INVALID_CREDENTIALS", "Téléphone ou code incorrect.", 401);
   }
 
   getSession(request) {
@@ -304,6 +339,52 @@ export class DriverSystem {
         INSERT INTO order_status_history (order_id, status, note, changed_at)
         VALUES (?, 'cancelled', ?, ?)
       `).run(orderId, `Livreur : ${cleanReason}`, nowIso);
+      const stillBusy = this.db.prepare(`
+        SELECT COUNT(*) AS count FROM orders
+        WHERE assigned_driver_id = ? AND status IN ('confirmed', 'ready')
+      `).get(driverId).count;
+      if (stillBusy === 0) {
+        this.db.prepare("UPDATE drivers SET current_status = 'available', updated_at = ? WHERE id = ?")
+          .run(nowIso, driverId);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return { orderId, cancelledAt: nowIso, reason: cleanReason };
+  }
+
+  // Annulation après départ : le client refuse ou ne récupère finalement pas la commande.
+  // La course reste attribuée au livreur pour conserver l'imputation dans ses stats,
+  // mais son statut annulé l'exclut des livraisons et du chiffre d'affaires réalisé.
+  markDeliveryCancelledByDriver(driverId, orderId, reason) {
+    const cleanReason = String(reason || "").trim().slice(0, 200);
+    if (!cleanReason) throw new DriverError("CANCEL_REASON_REQUIRED", "Un motif d'annulation est requis.");
+    const nowIso = this.now().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db.prepare("SELECT note FROM orders WHERE id = ?").get(orderId);
+      const enrichedNote = `${existing?.note || ""}${existing?.note ? "\n" : ""}[Livreur] Livraison annulée : ${cleanReason}`.slice(0, 1000);
+      const result = this.db.prepare(`
+        UPDATE orders
+        SET status = 'cancelled', note = ?, updated_at = ?
+        WHERE id = ?
+          AND assigned_driver_id = ?
+          AND status = 'ready'
+          AND driver_started_at IS NOT NULL
+      `).run(enrichedNote, nowIso, orderId, driverId);
+      if (!result.changes) {
+        throw new DriverError(
+          "ORDER_NOT_DELIVERY_CANCELLABLE",
+          "Cette livraison ne peut pas encore être annulée à cette étape.",
+          409,
+        );
+      }
+      this.db.prepare(`
+        INSERT INTO order_status_history (order_id, status, note, changed_at)
+        VALUES (?, 'cancelled', ?, ?)
+      `).run(orderId, `Livraison annulée par livreur : ${cleanReason}`, nowIso);
       const stillBusy = this.db.prepare(`
         SELECT COUNT(*) AS count FROM orders
         WHERE assigned_driver_id = ? AND status IN ('confirmed', 'ready')
@@ -460,14 +541,16 @@ export class DriverSystem {
              o.commune_name, o.delivery_address,
              o.delivery_latitude, o.delivery_longitude, o.delivery_maps_url,
              o.subtotal_cents, o.delivery_fee_cents, o.total_cents,
-             o.status, o.delivered_at, o.driver_assigned_at, o.created_at
+             o.status, o.delivered_at, o.driver_assigned_at, o.updated_at, o.created_at
       FROM orders o
       WHERE o.assigned_driver_id = ?
-        AND o.delivered_at IS NOT NULL
-        AND o.delivered_at >= ?
-      ORDER BY o.delivered_at DESC
+        AND (
+          (o.delivered_at IS NOT NULL AND o.delivered_at >= ?)
+          OR (o.status = 'cancelled' AND o.updated_at >= ?)
+        )
+      ORDER BY COALESCE(o.delivered_at, o.updated_at) DESC
       LIMIT 100
-    `).all(driverId, since);
+    `).all(driverId, since, since);
     return rows.map(mapHistoryRow);
   }
 
@@ -521,7 +604,7 @@ export class DriverSystem {
   _hydrateOrderForDriver(row) {
     const items = this.db.prepare(`
       SELECT product_id, title, unit_price_cents, quantity, line_total_cents
-      FROM order_items WHERE order_id = ? ORDER BY rowid
+      FROM order_items WHERE order_id = ? ORDER BY position, id
     `).all(row.id).map((item) => ({
       productId: item.product_id,
       title: item.title,
@@ -681,6 +764,7 @@ function mapHistoryRow(row) {
     totalCents: row.total_cents,
     status: row.status,
     deliveredAt: row.delivered_at,
+    cancelledAt: row.status === "cancelled" ? row.updated_at : null,
     driverAssignedAt: row.driver_assigned_at,
     createdAt: row.created_at,
   };

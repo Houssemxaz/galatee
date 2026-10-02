@@ -68,3 +68,18 @@ export function cancelOrder(orderId, reason) {
     body: JSON.stringify({ reason }),
   });
 }
+
+export function cancelDelivery(orderId, reason) {
+  const body = JSON.stringify({ reason });
+  return driverApi(`/driver/orders/${encodeURIComponent(orderId)}/cancel-delivery`, {
+    method: "POST",
+    body,
+  }).catch((error) => {
+    // Compatibilite avec une instance backend qui n'a pas encore recharge la route dediee.
+    if (error.status !== 404) throw error;
+    return driverApi(`/driver/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason, deliveryAttempt: true }),
+    });
+  });
+}

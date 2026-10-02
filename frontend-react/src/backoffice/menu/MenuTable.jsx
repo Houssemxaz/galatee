@@ -95,7 +95,7 @@ export default function MenuTable({ items, onEdit, onPreview, onPublish, onArchi
                 <td className="bo-menu-cat">{CATEGORY_LABELS[item.category] || item.category}</td>
                 <td><StatusBadge status={item.status} /></td>
                 <td>
-                  <span className={`bo-status ${item.available ? "bo-status-ok" : "bo-status-muted"}`}>
+                  <span className={`bo-status ${item.available ? "bo-status-ok" : "bo-status-err"}`}>
                     {item.available ? "Dispo" : "Rupture"}
                   </span>
                 </td>

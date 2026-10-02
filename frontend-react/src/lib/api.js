@@ -51,10 +51,6 @@ export function logoutCustomer() {
   return apiJson("/auth/logout", { method: "POST" });
 }
 
-export function fetchCustomerReservations() {
-  return apiJson("/account/reservations");
-}
-
 export function fetchCustomerOrders() {
   return apiJson("/account/orders");
 }
@@ -221,9 +217,13 @@ export async function fetchMenu() {
     const response = await fetch(`${API_BASE}/menu`, { headers: { Accept: "application/json" }, signal: controller.signal });
     if (!response.ok) throw new Error("menu-fetch-failed");
     const payload = await response.json();
-    return Array.isArray(payload.menu) ? payload.menu.map(withPbgOverride).map(toDish) : [];
+    const items = Array.isArray(payload.menu) ? payload.menu.map(withPbgOverride).map(toDish) : [];
+    items.promotions = Array.isArray(payload.promotions) ? payload.promotions : [];
+    return items;
   } catch {
-    return FALLBACK_MENU.map(withPbgOverride).map(toDish);
+    const items = FALLBACK_MENU.map(withPbgOverride).map(toDish);
+    items.promotions = [];
+    return items;
   } finally {
     window.clearTimeout(timeoutId);
   }

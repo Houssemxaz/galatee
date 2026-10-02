@@ -11,6 +11,7 @@ import OrdersPage from "./orders/OrdersPage.jsx";
 const MenuSection = lazy(() => import("./menu/MenuSection.jsx"));
 const AnalyticsSection = lazy(() => import("./analytics/AnalyticsSection.jsx"));
 const LoyaltyPage = lazy(() => import("./loyalty/LoyaltyPage.jsx"));
+const PromotionsPage = lazy(() => import("./marketing/PromotionsPage.jsx"));
 const ClubPage = lazy(() => import("./club/ClubPage.jsx"));
 const DeliveryPage = lazy(() => import("./delivery/DeliveryPage.jsx"));
 const DriversPage = lazy(() => import("./drivers/DriversPage.jsx"));
@@ -19,7 +20,8 @@ const SECTIONS = {
   orders: { label: "Commandes", render: () => <OrdersPage /> },
   menu: { label: "Menu", render: () => <MenuSection /> },
   stats: { label: "Statistiques", render: () => <AnalyticsSection /> },
-  loyalty: { label: "Fidélité", render: () => <LoyaltyPage /> },
+  loyalty: { label: "Fidélité", render: ({ onNavigate }) => <LoyaltyPage onNavigate={onNavigate} /> },
+  promotions: { label: "Promotions", render: ({ onNavigate }) => <PromotionsPage onNavigate={onNavigate} /> },
   club: { label: "Pasta Lover Club", render: () => <ClubPage /> },
   delivery: { label: "Livraison", render: () => <DeliveryPage /> },
   drivers: { label: "Livreurs", render: () => <DriversPage /> },
@@ -40,6 +42,7 @@ const G_SHORTCUTS = {
   d: "delivery",
   s: "stats",
   f: "loyalty",
+  p: "promotions",
   c: "club",
   l: "drivers",
 };
@@ -89,7 +92,7 @@ export default function BackofficeApp() {
         <main className="bo-main">
           <div className="bo-view">
             <Suspense fallback={<SectionFallback label={SECTIONS[active].label} />}>
-              {SECTIONS[active].render()}
+              {SECTIONS[active].render({ onNavigate: setActive })}
             </Suspense>
           </div>
         </main>

@@ -5,6 +5,7 @@ import {
   LineChart,
   ExternalLink,
   Gift,
+  Tag,
   ShoppingBag,
   UsersRound,
   Truck,
@@ -19,6 +20,7 @@ const COMMANDS = [
   { id: "delivery", group: "Aller à", label: "Livraison", Icon: Truck, hint: "g d", section: "delivery" },
   { id: "stats", group: "Aller à", label: "Statistiques", Icon: LineChart, hint: "g s", section: "stats" },
   { id: "loyalty", group: "Aller à", label: "Fidélité", Icon: Gift, hint: "g f", section: "loyalty" },
+  { id: "promotions", group: "Aller à", label: "Promotions", Icon: Tag, hint: "g p", section: "promotions" },
   { id: "club", group: "Aller à", label: "Pasta Lover Club", Icon: UsersRound, hint: "g c", section: "club" },
   { id: "public", group: "Actions", label: "Ouvrir le site public", Icon: ExternalLink, hint: "", action: "open-public" },
 ];

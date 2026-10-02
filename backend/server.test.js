@@ -41,9 +41,7 @@ test("HTTP admin API requires bearer auth when an admin token is configured", as
   assert.equal(preflightResponse.status, 204);
   assert.equal(preflightResponse.headers.get("access-control-allow-origin"), "https://demo-galatee.vercel.app");
   assert.match(preflightResponse.headers.get("access-control-allow-methods") || "", /OPTIONS/);
-  assert.match(preflightResponse.headers.get("access-control-allow-headers") || "", /Content-Type/);
-  assert.match(preflightResponse.headers.get("access-control-allow-headers") || "", /Authorization/);
-  assert.match(preflightResponse.headers.get("access-control-allow-headers") || "", /Idempotency-Key/);
+  assert.equal(preflightResponse.headers.get("access-control-allow-headers"), "Content-Type, Authorization, Idempotency-Key");
 
   const unauthorizedResponse = await fetch(`${baseUrl}/api/admin/menu`);
   assert.equal(unauthorizedResponse.status, 401);

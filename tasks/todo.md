@@ -1,5 +1,49 @@
 # Todo
 
+## Statistiques production et lisibilité (2026-09-29)
+- [x] Exposer et vérifier la source de données réelle de l’API statistiques.
+- [x] Verrouiller PostgreSQL en production et conserver SQLite uniquement pour le local.
+- [x] Réorganiser les graphes par usage et afficher des totaux lisibles.
+- [x] Valider le parcours réel du site, les tests et le build.
+
+## Repères des graphiques statistiques (2026-09-29)
+- [x] Ajouter les libellés X/Y et les unités sur chaque graphique.
+- [x] Clarifier la lecture du funnel et adapter l’affichage responsive.
+- [x] Valider le build après la correction.
+
+## Alignement de l'aperçu des promotions (2026-09-29)
+- [x] Autoriser plusieurs cibles en mode plat individuel avec une remise par ligne.
+- [x] Afficher un aperçu par plat en individuel et un aperçu global en pack.
+- [x] Aligner la validation serveur et les tests sur les deux modes.
+- [x] Valider `npm test` et `npm run build`.
+
+## Promotions indépendantes de la fidélité (2026-09-29)
+- [x] Ajouter un système persistant de promotions par plat ou par pack, avec une valeur propre à chaque règle.
+- [x] Exposer les promotions publiques et appliquer automatiquement la meilleure remise au panier et côté serveur.
+- [x] Ajouter un onglet back-office Promotions séparé de Fidélité.
+- [x] Ajouter les tests de calcul, de persistance et de commande puis valider `npm test` et `npm run build`.
+
+## Sélection des plats en promotion individuelle (2026-09-29)
+- [x] Permettre de sélectionner certains plats en mode individuel.
+- [x] Conserver la contrainte de présence complète uniquement pour le mode pack.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
+## Clarification de la portée des promotions fidélité (2026-09-29)
+- [x] Limiter le programme à deux modes exclusifs : tous les plats individuellement ou un pack précis.
+- [x] Aligner le calcul serveur, l’aperçu client et le back-office sur ces deux modes.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
+## Correction fidélité et diagnostic des tarifs (2026-09-29)
+- [x] Synchroniser les récompenses encore disponibles avec la règle fidélité active.
+- [x] Vérifier les tarifs réellement publiés et documenter le comportement brouillon/publication.
+- [x] Ajouter les tests de non-régression puis valider avec `npm test` et `npm run build`.
+
+## Clarification du calcul des récompenses fidélité (2026-09-28)
+- [x] Centraliser le calcul de remise côté serveur et côté client.
+- [x] Appliquer le pourcentage au prix initial et plafonner le montant fixe au prix initial.
+- [x] Afficher le calcul lisible et le prix après remise dans le back-office et le parcours de commande.
+- [x] Ajouter des tests pour les remises en pourcentage et en montant fixe.
+
 ## Projet
 Site web pour un restaurant chic / haut de gamme specialise dans les pates, avec systeme de reservation.
 
@@ -1011,3 +1055,364 @@ Décisions produit validées le 2026-09-03 : le responsable doit pouvoir modifie
 ## Runbook production (2026-09-28)
 - [x] RUNBOOK.md ajoute a la racine : variables d env, CORS, Brevo, systemd, sauvegarde/restauration SQLite + procedure Postgres, rollback applicatif et donnees, checklist post-deploiement 10 points.
 - [x] DEPLOY.md pointe sur RUNBOOK.md pour la production complete, garde le setup local + Vercel.
+
+## Audit mise en production (2026-09-27)
+- [x] Cartographier les changements récents et l'architecture actuelle
+- [x] Auditer les risques production: données, auth, API, uploads, rate limiting et observabilité
+- [x] Définir la stack finale et la topologie cible sur deux VPS Hostinger
+- [x] Produire une checklist de livraison et un ordre de migration
+
+> Audit réalisé: le rapport de mise en production est fourni dans la réponse du 2026-09-27. Aucun code applicatif n'a été modifié pendant cet audit.
+
+## Préparation migration PostgreSQL (2026-09-27)
+- [x] Créer un schéma PostgreSQL versionné qui conserve les contrats SQLite et l'historique réservation
+- [x] Ajouter un export/contrôle SQLite en lecture seule avec vérification d'intégrité et clés étrangères
+- [x] Ajouter un import transactionnel vers une base PostgreSQL neuve avec contrôle des colonnes et compteurs
+- [x] Ajouter les commandes, tests et documentation sans basculer encore le runtime applicatif
+- [ ] Ajouter l'adaptateur runtime PostgreSQL après revue de la branche de sécurisation
+
+## Adaptateur runtime PostgreSQL (2026-09-28)
+- [x] Ajouter une compatibilité de persistance PostgreSQL pour les modules synchrones existants
+- [x] Activer PostgreSQL uniquement avec `GALATEE_DATABASE=postgres` et conserver SQLite par défaut en local
+- [x] Tester la traduction des placeholders, des transactions et des introspections de schéma
+- [x] Vérifier le démarrage PostgreSQL, l'API menu et le build sans modifier les données SQLite historiques
+
+## Archivage et retrait du système de réservation (2026-09-28)
+- [x] Découpler le runtime commande du store et des tables de réservation
+- [x] Retirer les requêtes de réservation des statistiques et des surfaces actives
+- [x] Exporter les anciennes données de réservation dans une archive vérifiable hors dépôt
+- [x] Supprimer les tables et événements de réservation de la base PostgreSQL de staging
+- [x] Archiver puis retirer la copie SQLite locale de secours
+- [x] Tester l'intégrité PostgreSQL, les endpoints commande et l'absence des tables retirées
+
+## Correction manuelle des statuts de commande (2026-09-28)
+- [x] Ajouter une action de correction de statut réservée au backoffice, indépendante des transitions normales.
+- [x] Conserver une trace de chaque correction dans l'historique de commande avec un motif technique lisible.
+- [x] Ajouter un contrôle simple dans le détail d'une commande pour revenir au bon statut après une erreur d'employé ou de livreur.
+- [x] Ajouter les tests de correction, de validation et de non-régression des transitions normales.
+- [x] Vérifier `npm test` et `npm run build`.
+
+## Correction de l'éditeur de menu desktop (2026-09-28)
+- [x] Donner à la fenêtre d'édition du menu une largeur desktop adaptée au formulaire à deux colonnes.
+- [x] Supprimer l'espacement de lettres hérité du dialogue PIN sur les champs du plat.
+- [x] Aligner correctement catégorie, ordre et prix et éviter le chevauchement des actions de photo.
+- [x] Vérifier le build et le rendu de l'éditeur.
+
+## Couleurs sémantiques du menu et des actions (2026-09-28)
+- [x] Afficher en vert les états disponibles/publiés et les confirmations réussies.
+- [x] Afficher en rouge les états en rupture/non disponibles et les erreurs.
+- [x] Vérifier le rendu desktop, les tests et le build.
+
+## Visibilité des ruptures côté client (2026-09-28)
+- [x] Ajouter un indicateur de rupture de stock aux cartes publiques du menu et de l'accueil.
+- [x] Afficher le même état sur la fiche détaillée et retirer l'appel à commander quand l'article est indisponible.
+- [x] Vérifier le rendu responsive, les tests et le build.
+
+## Cartes plats de l'accueil : hover et navigation (2026-09-28)
+- [x] Rendre toute la carte directement cliquable vers la fiche du plat.
+- [x] Restaurer le tilt et le CTA visuel au survol sans zone morte.
+- [x] Vérifier la navigation, le rendu desktop/mobile, les tests et le build.
+
+## Correction des tarifs de livraison (2026-09-28)
+- [x] Corriger la double conversion des tarifs saisis depuis le back-office.
+- [x] Ajouter un test pour les valeurs envoyées comme texte par les champs numériques.
+- [x] Restaurer le tarif de test modifié pendant le diagnostic et vérifier le panier public.
+- [x] Vérifier les tests et le build.
+
+## Correction de l'édition des plats (2026-09-28)
+- [x] Corriger la priorité entre `price` et `priceCents` lors de l'édition d'une révision existante.
+- [x] Préserver la disponibilité pendant une édition ordinaire et permettre sa modification explicite.
+- [x] Vérifier l'enregistrement, la publication et la visibilité publique d'un nouveau prix.
+- [x] Vérifier les autres champs d'édition et restaurer les données de démonstration.
+- [x] Vérifier les tests et le build.
+
+## Navigation back-office et simulation fidélité (2026-09-28)
+- [x] Stabiliser la sidebar et la topbar pendant le scroll sans recouvrement du contenu.
+- [x] Afficher une simulation agrégée pour un, deux ou plusieurs plats.
+- [x] Recalculer en temps réel le sous-total, la remise et le prix final pour les deux types de récompense.
+- [x] Vérifier le rendu desktop, mobile, le changement de type de remise et le build.
+
+## Portée des récompenses fidélité et packs (2026-09-28)
+- [x] Distinguer une remise sur les plats éligibles d'une remise conditionnée par un pack complet.
+- [x] Appliquer la remise uniquement au sous-total des plats concernés, jamais aux autres articles de la commande.
+- [x] Exiger tous les plats du pack avant d'autoriser la récompense, côté interface et côté serveur.
+- [x] Conserver la portée de la récompense lors de son émission pour ne pas modifier rétroactivement les récompenses existantes.
+- [x] Ajouter les tests des remises en pourcentage et montant fixe avec plats éligibles et non éligibles.
+- [x] Vérifier les migrations PostgreSQL idempotentes, `npm test` et `npm run build`.
+
+## Illustrations éditoriales générées (2026-09-28)
+- [x] Ajouter les illustrations sélectionnées au pack de marque public sans modifier les mockups statiques.
+- [x] Placer les accents culinaires, livraison, club et Alger dans les surfaces qui leur donnent un contexte utile.
+- [x] Réduire ou masquer les illustrations secondaires sur mobile pour préserver la lisibilité et les actions principales.
+- [x] Vérifier le chargement lazy des assets, le build et les tests.
+
+## Composition desktop de la section menu (2026-09-28)
+- [x] Structurer l'en-tête en trois zones : repère, message éditorial et illustration.
+- [x] Donner à l'illustration une colonne dédiée pour éviter les superpositions avec le titre.
+- [x] Réduire l'espace mort avant la grille et conserver les règles mobiles existantes.
+- [x] Vérifier la mesure de la composition, les tests et le build.
+
+## Lecture complète de la section menu desktop (2026-09-28)
+- [x] Ajuster la section à une hauteur d'écran desktop avec un espacement plus compact.
+- [x] Garder les trois cartes sur une seule ligne pour éviter un second scroll dans la section.
+- [x] Conserver le CTA et l'illustration dans le même viewport.
+- [x] Valider visuellement cette composition avant de passer à la section suivante.
+
+## Composition créative centrée du menu desktop (2026-09-28)
+- [x] Centrer le texte et faire des plats le point focal inférieur de la section.
+- [x] Encadrer la scène avec des illustrations latérales et un accent visuel bas.
+- [x] Ajouter des inclinaisons légères et distinctes aux cartes sans casser leurs zones de clic.
+- [x] Désactiver les accents décoratifs sur mobile et vérifier tests, build et chargement des assets.
+
+## Arc de cartes et illustration épurée (2026-09-28)
+- [x] Laisser la ligne de texte centrale sans illustration concurrente.
+- [x] Abaisser les cartes latérales et relever la carte centrale pour former un semi-cercle.
+- [x] Remplacer les anciens motifs tomate/spaghetti par deux illustrations générées positionnées en bord inférieur.
+- [x] Vérifier les transformations réelles des liens, les tests et le build.
+
+## Texte large et composition simplifiée du menu (2026-09-28)
+- [x] Remettre les trois cartes sur une ligne simple sans rotation.
+- [x] Étendre le texte centré dans une ligne horizontale.
+- [x] Conserver une seule illustration centrée sous les plats.
+- [x] Neutraliser les anciens motifs dans cette section et vérifier les tests/build.
+
+## Ajustement de l'illustration basse du menu (2026-09-28)
+- [x] Décaler légèrement l'illustration vers la droite.
+- [x] L'aligner sur le même équilibre bas-droite que le CTA desktop.
+- [x] Vérifier le rendu et le build.
+
+## Illustration de la page commande (2026-09-28)
+- [x] Déplacer la pancarte dans l'espace libre à droite du contenu desktop.
+- [x] Ajouter un micro-effet de survol discret et non bloquant.
+- [x] Respecter `prefers-reduced-motion` et vérifier le build.
+
+## Agrandissement de la pancarte commande (2026-09-28)
+- [x] Agrandir la pancarte et la garder dans la zone droite du chapitre.
+- [x] Retirer l'ancien motif de pâtes propre à cette section.
+- [x] Préserver la hiérarchie du texte et des informations de service.
+
+## Inclinaison de la pancarte commande (2026-09-28)
+- [x] Inverser l'inclinaison de la pancarte vers le côté opposé.
+- [x] Conserver le mouvement de survol dans la nouvelle direction.
+
+## Pancarte informative de commande (2026-09-28)
+- [x] Remplacer l'ancienne illustration ticket par une pancarte inspirée de la carte Pasta Lover Club.
+- [x] Intégrer service, horaires et format directement dans la pancarte.
+- [x] Supprimer le bloc d'informations séparé pour éviter la redondance.
+- [x] Conserver une version responsive lisible et vérifier tests/build.
+- [x] Masquer le motif de pâtes hérité et éviter le chevauchement aux largeurs desktop intermédiaires.
+
+## Finition visuelle de la pancarte commande (2026-09-28)
+- [x] Remonter la pancarte et la conserver dans l'espace droit de la section.
+- [x] Adapter son fond vers un bordeaux profond cohérent avec la référence visuelle.
+- [x] Éclaircir les textes et les bordures pour conserver le contraste.
+
+## Position finale de la pancarte commande (2026-09-28)
+- [x] Remonter la pancarte pour libérer la zone du CTA flottant.
+- [x] La décaler davantage vers la droite pour séparer le texte et la pancarte.
+- [x] Supprimer l'ornement tomate hérité de la section.
+
+## Palette olive de la pancarte commande (2026-09-28)
+- [x] Remplacer le bordeaux par un olive profond inspiré de la carte de référence.
+- [x] Utiliser l'or pour les repères et le crème pour les contenus.
+- [x] Vérifier le contraste, les tests et le build.
+
+## Échelle finale de la pancarte commande (2026-09-28)
+- [x] Agrandir légèrement la pancarte sur desktop.
+- [x] La remonter pour mieux équilibrer le chapitre et le CTA.
+
+## Composition finale de la pancarte commande (2026-09-28)
+- [x] Agrandir davantage la pancarte sur desktop large.
+- [x] L'aligner avec le début du titre principal.
+- [x] Inverser son inclinaison et conserver un hover discret.
+
+## Pancarte verticale sans inclinaison (2026-09-28)
+- [x] Retirer complètement l'inclinaison de la pancarte.
+- [x] Réduire sa largeur et empiler les trois informations pour une forme plus longue.
+- [x] La maintenir à droite pour ne pas masquer le texte principal.
+
+## Alignement supérieur de la pancarte commande (2026-09-28)
+- [x] Remonter légèrement la pancarte pour aligner son bord supérieur avec le texte principal.
+- [x] Conserver la largeur, la palette et l'absence d'inclinaison.
+
+## Scooter sur la page de commande (2026-09-28)
+- [x] Retirer le motif tomate de la section récapitulative.
+- [x] Conserver le scooter comme illustration principale sur desktop.
+- [x] Réafficher le scooter sur mobile avec une taille et une position adaptées.
+
+## Composition Club avec disque vinyle (2026-09-28)
+- [x] Retirer le motif de pâtes de l'introduction du Club.
+- [x] Descendre l'illustration vinyle pour faire apparaître le disque sous la pancarte.
+- [x] Positionner le disque en bas à droite sur mobile sans gêner la carte membre.
+
+## Visibilité complète du disque vinyle (2026-09-28)
+- [x] Descendre davantage le disque sur desktop pour dégager sa partie inférieure.
+- [x] Appliquer le même ajustement sur les deux variantes mobiles.
+
+## Ajustement desktop du disque vinyle (2026-09-28)
+- [x] Descendre davantage le disque uniquement sur desktop.
+- [x] Préserver le positionnement mobile déjà validé.
+
+## Densification visuelle de l'introduction Club (2026-09-28)
+- [x] Réduire l'espace vertical inutile sur desktop.
+- [x] Rendre le CTA compact au lieu de l'étirer sur toute la colonne.
+- [x] Ajouter une ligne éditoriale courte avec les trois avantages du Club.
+- [x] Préserver une version mobile empilée et lisible.
+
+## Finition mobile de l'introduction Club (2026-09-28)
+- [x] Masquer la ligne numérotée des avantages sur mobile.
+- [x] Réserver un espace inférieur dédié à l'illustration vinyle.
+- [x] Rendre le casque et le disque entièrement visibles en bas à droite.
+
+## Rééquilibrage desktop de la page Informations (2026-09-28)
+- [x] Retirer l'illustration d'arche sur desktop et mobile.
+- [x] Conserver la grille mobile sans la restructurer.
+- [x] Centrer verticalement le contenu de la grande carte desktop.
+- [x] Harmoniser les deux cartes secondaires desktop.
+
+## Rééquilibrage desktop des événements privés (2026-09-28)
+- [x] Recomposer la section rouge uniquement au breakpoint desktop.
+- [x] Renforcer le contraste du texte sur le fond tomate.
+- [x] Organiser le CTA et les métadonnées dans un rail inférieur.
+- [x] Préserver la mise en page mobile existante.
+
+## Illustration desktop des régimes alimentaires (2026-09-28)
+- [x] Retirer le motif de pâtes générique de la section.
+- [x] Ajouter une illustration d'ingrédients cohérente avec la carte alimentaire.
+- [x] Corriger explicitement la couleur du texte de la section événements sur fond tomate.
+- [x] Préserver le rendu mobile existant.
+
+## Parité des couleurs desktop/mobile des événements (2026-09-28)
+- [x] Rendre le numéro de section desktop aussi clair que sur mobile.
+- [x] Conserver la hiérarchie ivoire pour le contenu et dorée pour les repères.
+- [x] Aligner l'opacité des métadonnées desktop sur le rendu mobile.
+
+## Recomposition de la FAQ (2026-09-28)
+- [x] Retirer les motifs génériques de pâtes et de feuille de la page.
+- [x] Ajouter une illustration de sauce positionnée en bas à droite sur desktop et mobile.
+- [x] Harmoniser les couleurs du repère, du titre et du texte sur les deux versions.
+- [x] Vérifier la lisibilité de l'accordéon autour de l'illustration.
+
+## Retrait de l'illustration FAQ (2026-09-28)
+- [x] Retirer l'illustration de sauce sur desktop et mobile.
+- [x] Nettoyer les règles CSS et conserver le fond sans motifs génériques.
+- [x] Préserver les couleurs corrigées et la lisibilité de l'accordéon.
+
+## Retrait du motif spaghetti de la section Adresse (2026-09-28)
+- [x] Retirer le motif spaghetti de la section située sous la FAQ.
+- [x] Conserver la carte d'adresse et son fond clair inchangés.
+
+## Retrait de l'illustration de la page Menu (2026-09-28)
+- [x] Retirer l'illustration d'ingrédients du header desktop et mobile.
+- [x] Nettoyer ses règles responsive et `prefers-reduced-motion`.
+- [x] Préparer trois directions visuelles séparées pour remplir l'espace desktop.
+
+## Rail éditorial et prix des plats (2026-09-28)
+- [x] Intégrer la proposition 1 comme rail éditorial desktop de la page Menu.
+- [x] Conserver la grille mobile sans rail supplémentaire.
+- [x] Afficher les prix sur toutes les vues où les plats sont présentés.
+- [x] Vérifier les tests et le build.
+
+## Retrait des illustrations des fiches plats (2026-09-28)
+- [x] Retirer l'illustration décorative de toutes les fiches plats.
+- [x] Nettoyer les règles CSS desktop, mobile et reduced-motion associées.
+- [x] Vérifier les tests et le build.
+
+## Retour à la composition pleine largeur du Menu (2026-09-28)
+- [x] Retirer le rail éditorial et revenir à la grille originale des plats.
+- [x] Centrer le grand titre et réduire le vide du header desktop.
+- [x] Vérifier mobile, tests et build.
+
+## Refonte de la PWA livreur (2026-09-28)
+- [x] Restructurer l'accueil livreur autour du statut, des indicateurs et de la course active.
+- [x] Ajouter une navigation mobile persistante et des états de course lisibles.
+- [x] Harmoniser les statistiques et la connexion avec la nouvelle direction sombre.
+- [x] Vérifier les interactions existantes, les tests et le build.
+
+## Annulation au dernier stade d'une livraison (2026-09-28)
+- [x] Ajouter la transition backend dédiée pour une livraison refusée ou non récupérée.
+- [x] Afficher le choix final `Livrée` / `Livraison annulée` avec deux actions explicites.
+- [x] Vérifier l'historique, les agrégations de chiffre d'affaires et les tests.
+- [x] Rendre l'appel compatible avec une instance backend qui n'a pas encore rechargé le nouvel endpoint.
+
+## Harmonisation visuelle du backoffice (2026-09-28)
+- [x] Remplacer la palette dark bleue/frozen par la palette olive/tomate de la PWA livreur.
+- [x] Améliorer le light mode avec un fond papier chaud et des surfaces plus lisibles.
+- [x] Garder les layouts, espacements et composants métier inchangés.
+- [x] Vérifier le build et les tests après la correction.
+- [x] Corriger le contraste des cellules de tableau au survol en dark mode.
+
+## Alignement du dark mode back-office sur la PWA livreur (2026-09-28)
+- [x] Remplacer les surfaces olive trop profondes par les tokens de la PWA livreur.
+- [x] Conserver les accents tomate/dore et vérifier le contraste des composants.
+- [x] Recompiler, tester et contrôler le rendu desktop.
+
+## Code splitting contrôlé (2026-09-29)
+- [x] Lazy-loader les pages secondaires du site et la PWA livreur.
+- [x] Lazy-loader les sections secondaires du back-office et les graphiques analytics.
+- [x] Conserver toutes les routes compte existantes et vérifier tests/build.
+
+## Durcissement production adapté (2026-09-29)
+- [x] Ajouter les headers de sécurité, CORS strict en production et les request IDs.
+- [x] Ajouter rate limiting, idempotence des commandes et health checks live/ready.
+- [x] Ajouter l'arrêt propre, les verrous de démarrage production et les tests régressifs.
+- [x] Ajouter un mode Redis partagé pour le rate limiting et l'idempotence, activé par `REDIS_URL`.
+- [ ] Remplacer les stores mémoire par Redis si plusieurs instances backend sont déployées.
+
+## Suite E2E isolée (2026-09-29)
+- [x] Ajouter Playwright et un serveur de test avec base SQLite temporaire.
+- [x] Couvrir commande client, parcours livreur et accès back-office.
+- [x] Exécuter la suite sans modifier la base locale et documenter la commande.
+
+## Préparation déploiement mono-VPS (2026-09-29)
+- [x] Ajouter un packaging Docker reproductible pour le backend et le build frontend.
+- [x] Décrire la séquence PostgreSQL, sauvegarde, vérification et rollback sans secrets committés.
+- [x] Vérifier la configuration générée et documenter ce qui devra être exécuté sur le VPS.
+- [x] Ajouter un contrôle local des variables de production avant démarrage Docker.
+- [x] Auditer les dépendances runtime: aucune vulnérabilité élevée ou critique détectée.
+- [x] Corriger et auditer les dépendances frontend: aucune vulnérabilité restante.
+- [x] Vérifier statiquement la configuration Docker Compose sans démarrer de conteneurs.
+- [x] Construire et démarrer l'image Docker localement avec un fichier `.env.production` de test non sensible.
+- [x] Tester localement PostgreSQL Docker, la migration, le health check ready et une restauration de sauvegarde.
+- [x] Tester le profil Redis partagé et le health check `sharedStore=redis`.
+- [x] Faire la revue finale de release: secrets, logs, uploads persistants, rollback et checklist client.
+- [ ] Acheter et initialiser le VPS, puis exécuter la migration sur une base PostgreSQL de production.
+
+## Correctif PWA livreur et adaptation desktop (2026-09-29)
+- [x] Rendre le bouton Courses fonctionnel avec un défilement fiable vers le pool disponible.
+- [x] Ajouter une composition desktop lisible sans modifier la hiérarchie mobile.
+- [x] Vérifier la route livreur, les tests et le build.
+
+## Renforcement sécurité PWA livreur (2026-09-29)
+- [x] Bloquer les mutations livreur envoyées depuis une origine web non autorisée.
+- [x] Couvrir la règle par un test unitaire sans casser les appels locaux.
+- [x] Vérifier les tests backend et le build après le changement.
+
+## Verrouillage PIN livreur (2026-09-29)
+- [x] Bloquer une connexion après cinq échecs pendant cinq minutes.
+- [x] Débloquer automatiquement la connexion après le délai et couvrir le comportement par test.
+- [x] Vérifier les tests backend et le build.
+
+## Vraie version desktop de la PWA livreur (2026-09-29)
+- [x] Remplacer la barre basse par une navigation latérale desktop avec identité de l'espace.
+- [x] Étendre le shell à la largeur de travail et organiser le contenu opérationnel en deux colonnes.
+- [x] Vérifier que la navigation mobile et le parcours livreur restent inchangés.
+
+## Harmonisation dark mode back-office et PWA livreur (2026-09-29)
+- [x] Aligner les fonds et surfaces du back-office sur la palette de la PWA livreur.
+- [x] Garder la structure, le mode clair et les interactions inchangés.
+- [x] Vérifier les tests et le build.
+# Refonte des statistiques du back-office (2026-09-29)
+
+- [x] Ajouter la comparaison avec la période précédente dans la réponse `site-stats`.
+- [x] Remplacer le graphique mélangé par des graphiques séparés : trafic, funnel, commandes et CA.
+- [x] Afficher les créneaux les plus demandés et rendre la performance des plats plus lisible.
+- [x] Harmoniser les styles responsive de la page statistiques.
+- [x] Ajouter/adapter les tests puis lancer `npm test` et `npm run build`.
+
+## Nettoyage et passation technique avant push (2026-09-29)
+
+- [x] Structurer les points sensibles du backend avec des commentaires courts et utiles.
+- [x] Ajouter un guide de lecture du projet pour le développement backend et la mise en production.
+- [x] Vérifier les fichiers suivis, les secrets, le lint implicite et les tests/build.
+- [x] Committer puis pousser les changements validés sur la branche courante.

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, PackageX } from "lucide-react";
 import Reveal from "@/components/Reveal";
 import PopCTA from "@/components/PopCTA";
 import DishImage from "@/components/DishImage";
 import SEO from "@/components/SEO";
 import { fetchMenu } from "@/lib/api";
+import { formatDzd } from "@/lib/formatters";
 
 export default function DishPage() {
   const { slug } = useParams();
@@ -51,10 +52,9 @@ export default function DishPage() {
       "@type": "Offer",
       "price": (dish.priceCents / 100).toFixed(2),
       "priceCurrency": "DZD",
-      "availability": "https://schema.org/InStock",
+      "availability": dish.available ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     } : undefined,
   };
-
   return (
     <div className="page page-dish pbg-page pbg-page-cream">
       <SEO
@@ -81,15 +81,25 @@ export default function DishPage() {
         </Reveal>
         <Reveal delay={120} className="pbg-dish-hero-copy">
           <span className="pbg-dish-page-label">{dish.label}</span>
-          <h1 className="pbg-dish-page-title">{dish.title}</h1>
+          <div className="pbg-dish-page-title-row">
+            <h1 className="pbg-dish-page-title">{dish.title}</h1>
+            <strong className="pbg-dish-page-price">{formatDzd(dish.priceCents)}</strong>
+          </div>
           <p className="pbg-dish-page-summary">{dish.summary}</p>
           <div className="pbg-dish-page-rule" aria-hidden="true" />
           <p className="pbg-dish-page-desc">{dish.description}</p>
           <div className="pbg-dish-page-actions">
-            <PopCTA as={Link} to={`/commande?dish=${encodeURIComponent(dish.id)}`}>
-              <span>Commander ce plat</span>
-              <ArrowUpRight size={14} strokeWidth={2} />
-            </PopCTA>
+            {dish.available ? (
+              <PopCTA as={Link} to={`/commande?dish=${encodeURIComponent(dish.id)}`}>
+                <span>Commander ce plat</span>
+                <ArrowUpRight size={14} strokeWidth={2} />
+              </PopCTA>
+            ) : (
+              <p className="pbg-dish-stock-status" role="status">
+                <PackageX size={15} strokeWidth={1.8} />
+                <span>Rupture de stock</span>
+              </p>
+            )}
             <Link to="/menu" className="pbg-dish-back-link">
               <ArrowLeft size={14} strokeWidth={1.8} />
               <span>Voir les autres plats</span>

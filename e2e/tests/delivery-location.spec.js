@@ -120,6 +120,37 @@ test.describe("permission de localisation accordee", () => {
     expect(nav.source).toBe("link");
     expect(nav.href).toBe(SHORT_LINK);
   });
+
+  test("le bouton prend une position fraiche, pas celle obtenue a l arrivee", async ({ page, context }) => {
+    await goToCheckout(page, "Fraiche");
+    // La position de l arrivee sur la page est deja en memoire...
+    await expect.poll(async () => (await readGeolocationStore(page))?.position?.latitude).toBe(HYDRA.latitude);
+
+    // ...puis le client se deplace (ou le GPS se cale) avant de cliquer.
+    const entrance = { latitude: 36.7488, longitude: 3.0512 };
+    await context.setGeolocation({ ...entrance, accuracy: 8 });
+    await page.getByRole("button", { name: /Utiliser ma position exacte/i }).click();
+    await expect(page.getByText(/Votre position exacte/)).toBeVisible();
+
+    const order = await submitOrder(page);
+    expect(order.deliveryLatitude).toBe(entrance.latitude);
+    expect(order.deliveryLongitude).toBe(entrance.longitude);
+  });
+});
+
+test.describe("position imprecise (ordinateur sans GPS)", () => {
+  test.use({ permissions: ["geolocation"], geolocation: { latitude: 36.756, longitude: 2.971, accuracy: 2500 } });
+
+  test("une estimation a plusieurs km est refusee et n est pas envoyee", async ({ page }) => {
+    await goToCheckout(page, "Imprecise");
+    await page.getByRole("button", { name: /Utiliser ma position exacte/i }).click();
+    await expect(page.getByText(/Position trop imprécise \(± 2,5 km\)/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Aucun point enregistré/)).toBeVisible();
+
+    const order = await submitOrder(page);
+    expect(order.deliveryLatitude).toBeNull();
+    expect(order.deliveryLongitude).toBeNull();
+  });
 });
 
 test("lien Google Maps complet : point detecte, confirme, ouvert tel quel par le livreur", async ({ page, request }) => {

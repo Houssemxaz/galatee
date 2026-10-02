@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-// Position du client demandee des l arrivee sur le site, pour qu au checkout
-// la permission soit deja tranchee (accordee ou refusee) et que le bouton
-// "Utiliser ma position exacte" reponde instantanement.
+// Permission de localisation demandee des l arrivee sur le site, pour qu au
+// checkout elle soit deja tranchee (accordee ou refusee). La position obtenue
+// a l arrivee n est PAS reutilisee pour la commande : c est souvent un premier
+// point grossier (estimation par le reseau). Le bouton du checkout passe par
+// requestPrecisePosition(), qui attend un point GPS frais.
 //
 // Deux declencheurs :
 //   1. Au montage : demande automatique (ou lecture silencieuse si la
@@ -14,16 +16,31 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 // Le resultat (coordonnees ou refus) est garde en sessionStorage.
 
 const KEY = "galatee.geolocation";
-// Au-dela, le bouton du checkout redemande une position fraiche.
-const FRESH_MS = 5 * 60 * 1000;
 const FINAL_STATUSES = ["granted", "denied", "unavailable"];
 const GEO_OPTIONS = { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 };
+// Position precise du checkout : on suit le GPS jusqu a atteindre cette
+// precision, ou jusqu au delai max, et on garde le meilleur point recu.
+const PRECISE_TARGET_M = 25;
+const PRECISE_MAX_WAIT_MS = 15_000;
 
 const GeolocationContext = createContext({
   status: "idle",
   position: null,
-  requestPosition: () => Promise.reject(new Error("GeolocationProvider manquant")),
+  requestPrecisePosition: () => Promise.reject(new Error("GeolocationProvider manquant")),
 });
+
+function geoError(status) {
+  return Object.assign(new Error(status), { status });
+}
+
+function toPosition(pos) {
+  return {
+    latitude: Number(pos.coords.latitude.toFixed(6)),
+    longitude: Number(pos.coords.longitude.toFixed(6)),
+    accuracy: Math.round(pos.coords.accuracy),
+    timestamp: pos.timestamp || Date.now(),
+  };
+}
 
 function readStore() {
   try {
@@ -59,7 +76,7 @@ export function GeolocationProvider({ children }) {
   const request = useCallback(({ force = false } = {}) => {
     if (!hasGeolocation()) {
       apply({ status: "unavailable", position: null });
-      return Promise.reject(Object.assign(new Error("unavailable"), { status: "unavailable" }));
+      return Promise.reject(geoError("unavailable"));
     }
     if (pendingRef.current && !force) return pendingRef.current;
     statusRef.current = "pending";
@@ -69,12 +86,7 @@ export function GeolocationProvider({ children }) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           settle();
-          const position = {
-            latitude: Number(pos.coords.latitude.toFixed(6)),
-            longitude: Number(pos.coords.longitude.toFixed(6)),
-            accuracy: Math.round(pos.coords.accuracy),
-            timestamp: pos.timestamp || Date.now(),
-          };
+          const position = toPosition(pos);
           apply({ status: "granted", position });
           resolve(position);
         },
@@ -90,7 +102,7 @@ export function GeolocationProvider({ children }) {
             writeStore(next);
             return next;
           });
-          reject(Object.assign(new Error(status), { status }));
+          reject(geoError(status));
         },
         GEO_OPTIONS,
       );
@@ -150,16 +162,53 @@ export function GeolocationProvider({ children }) {
     };
   }, [state.status, request]);
 
-  // Pour le checkout : position recente si on l a deja, sinon nouvelle demande.
-  const requestPosition = useCallback(async () => {
-    const { position } = state;
-    if (state.status === "granted" && position && Date.now() - position.timestamp < FRESH_MS) return position;
-    return request();
-  }, [state, request]);
+  // Pour le checkout : point GPS frais (jamais de cache), affine pendant
+  // quelques secondes. Le premier point d un telephone vient souvent du reseau
+  // (centaines de metres, voire kilometres) avant que le GPS ne se cale.
+  const requestPrecisePosition = useCallback(() => new Promise((resolve, reject) => {
+    if (!hasGeolocation()) {
+      apply({ status: "unavailable", position: null });
+      reject(geoError("unavailable"));
+      return;
+    }
+    let best = null;
+    let done = false;
+    let watchId = null;
+    let timer = null;
+    const finish = (error) => {
+      if (done) return;
+      done = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      window.clearTimeout(timer);
+      if (best) {
+        apply({ status: "granted", position: best });
+        resolve(best);
+      } else {
+        reject(error || geoError("error"));
+      }
+    };
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const position = toPosition(pos);
+        if (!best || position.accuracy < best.accuracy) best = position;
+        if (best.accuracy <= PRECISE_TARGET_M) finish();
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          apply({ status: "denied", position: null });
+          finish(geoError("denied"));
+        }
+        // Timeout ou signal absent : on attend la fin du delai, avec le
+        // meilleur point deja recu s il y en a un.
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: PRECISE_MAX_WAIT_MS },
+    );
+    timer = window.setTimeout(() => finish(), PRECISE_MAX_WAIT_MS);
+  }), [apply]);
 
   const value = useMemo(
-    () => ({ status: state.status, position: state.position, requestPosition }),
-    [state.status, state.position, requestPosition],
+    () => ({ status: state.status, position: state.position, requestPrecisePosition }),
+    [state.status, state.position, requestPrecisePosition],
   );
 
   return <GeolocationContext.Provider value={value}>{children}</GeolocationContext.Provider>;

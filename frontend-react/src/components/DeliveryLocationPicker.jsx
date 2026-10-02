@@ -13,7 +13,14 @@ import "./DeliveryLocationPicker.css";
 // Sans l un ni l autre, le livreur utilise l adresse + la commune (lib/maps.js).
 
 // Au-dela, on previent le client que sa position est approximative.
-const LOW_ACCURACY_M = 150;
+const LOW_ACCURACY_M = 60;
+// Au-dela, la position n est pas enregistree : c est une estimation par le
+// reseau (ordinateur sans GPS, GPS coupe), souvent fausse de plusieurs km.
+const MAX_ACCURACY_M = 200;
+
+function formatDistance(meters) {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1).replace(".", ",")} km` : `${meters} m`;
+}
 
 const GEO_ERRORS = {
   denied: "Localisation refusée. Autorisez-la dans les réglages du navigateur, ou collez un lien Google Maps.",
@@ -69,7 +76,7 @@ function LinkFeedback({ result, applied, onApply }) {
 }
 
 export default function DeliveryLocationPicker({ latitude, longitude, mapsUrl, onChange }) {
-  const { status: geoStatus, requestPosition } = useGeolocation();
+  const { status: geoStatus, requestPrecisePosition } = useGeolocation();
   const [locating, setLocating] = useState(false);
   const [geoMessage, setGeoMessage] = useState("");
   const [accuracy, setAccuracy] = useState(null);
@@ -83,7 +90,11 @@ export default function DeliveryLocationPicker({ latitude, longitude, mapsUrl, o
     setGeoMessage("");
     setLocating(true);
     try {
-      const position = await requestPosition();
+      const position = await requestPrecisePosition();
+      if (position.accuracy > MAX_ACCURACY_M) {
+        setGeoMessage(`Position trop imprécise (± ${formatDistance(position.accuracy)}) : elle n'a pas été enregistrée. Sur ordinateur, la position est estimée via la connexion internet et peut être fausse de plusieurs kilomètres. Utilisez votre téléphone avec le GPS activé, ou collez un lien Google Maps.`);
+        return;
+      }
       if (!isInDeliveryArea(position.latitude, position.longitude)) {
         setGeoMessage("Votre position actuelle est en dehors de notre zone de livraison à Alger. Si vous commandez pour une autre adresse, collez plutôt un lien Google Maps.");
         return;
@@ -139,12 +150,14 @@ export default function DeliveryLocationPicker({ latitude, longitude, mapsUrl, o
           <p className="pbg-loc-option-title"><Crosshair size={12} strokeWidth={2} /> Ma position</p>
           <button type="button" className="pbg-loc-btn" onClick={useMyPosition} disabled={locating}>
             <Crosshair size={15} strokeWidth={2} />
-            <span>{locating ? "Localisation…" : "Utiliser ma position exacte"}</span>
+            <span>{locating ? "Recherche du signal GPS…" : "Utiliser ma position exacte"}</span>
           </button>
           <p className="pbg-loc-note">
             {geoStatus === "denied"
               ? "Localisation refusée sur cet appareil."
-              : "Idéal si vous êtes déjà à l'adresse de livraison."}
+              : locating
+                ? "Quelques secondes : le GPS affine votre position."
+                : "Depuis votre téléphone, GPS activé, si vous êtes déjà à l'adresse de livraison."}
           </p>
           {geoMessage && <p className="pbg-loc-feedback is-error" role="status">{geoMessage}</p>}
         </div>
